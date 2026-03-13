@@ -10,6 +10,9 @@ st.set_page_config(
     layout="wide"
 )
 
+from utils.auth import check_password
+check_password()
+
 st.sidebar.markdown("## 🎭 GS칼텍스 예울마루")
 st.sidebar.markdown("---")
 st.sidebar.markdown("운영실적 종합 대시보드")

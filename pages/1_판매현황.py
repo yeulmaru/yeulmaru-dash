@@ -11,6 +11,9 @@ from utils.charts import COLORS, apply_common_layout
 
 st.set_page_config(page_title="실시간 판매현황", page_icon="📊", layout="wide")
 
+from utils.auth import check_password
+check_password()
+
 st.title("📊 실시간 판매현황")
 
 daily_df = load_daily_input()

@@ -11,6 +11,9 @@ from utils.charts import COLORS, apply_common_layout
 
 st.set_page_config(page_title="2025 공연사업 실적", page_icon="💰", layout="wide")
 
+from utils.auth import check_password
+check_password()
+
 st.title("💰 2025 공연사업 실적")
 
 df = load_25_performance()

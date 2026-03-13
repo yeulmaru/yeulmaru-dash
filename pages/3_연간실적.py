@@ -10,6 +10,10 @@ from utils.data_loader import load_yearly_performance, load_detailed_management
 from utils.charts import COLORS, apply_common_layout
 
 st.set_page_config(page_title="연간 운영실적", page_icon="📈", layout="wide")
+
+from utils.auth import check_password
+check_password()
+
 st.title("📈 연간 운영실적 (2012~)")
 
 yearly_df = load_yearly_performance()
