@@ -40,23 +40,40 @@ def download_excel_from_sharepoint():
         site_resp.raise_for_status()
         site_id = site_resp.json()["id"]
 
-        # 2) 파일 검색 (드라이브 루트에서)
-        file_url = f"https://graph.microsoft.com/v1.0/sites/{site_id}/drive/root:/{file_name}:/content"
-        file_resp = requests.get(file_url, headers=headers)
+        # 2) 사이트 내 모든 드라이브에서 파일 검색
+        search_url = f"https://graph.microsoft.com/v1.0/sites/{site_id}/drive/root/search(q='{file_name}')"
+        search_resp = requests.get(search_url, headers=headers)
+        search_resp.raise_for_status()
+        items = search_resp.json().get("value", [])
 
-        # 루트에 없으면 전체 검색
-        if file_resp.status_code == 404:
-            search_url = f"https://graph.microsoft.com/v1.0/sites/{site_id}/drive/root/search(q='{file_name}')"
-            search_resp = requests.get(search_url, headers=headers)
-            search_resp.raise_for_status()
-            items = search_resp.json().get("value", [])
-            if items:
-                download_url = items[0].get("@microsoft.graph.downloadUrl")
-                if download_url:
-                    file_resp = requests.get(download_url)
+        # 정확한 파일명 매칭
+        target = None
+        for item in items:
+            if item.get("name") == file_name:
+                target = item
+                break
 
+        if not target and items:
+            target = items[0]
+
+        if not target:
+            st.warning("SharePoint에서 파일을 찾을 수 없습니다.")
+            return None
+
+        # 3) 다운로드 URL로 파일 받기
+        download_url = target.get("@microsoft.graph.downloadUrl")
+        if download_url:
+            file_resp = requests.get(download_url)
+            file_resp.raise_for_status()
+            return io.BytesIO(file_resp.content)
+
+        # downloadUrl 없으면 id로 다운로드
+        item_id = target["id"]
+        content_url = f"https://graph.microsoft.com/v1.0/sites/{site_id}/drive/items/{item_id}/content"
+        file_resp = requests.get(content_url, headers=headers)
         file_resp.raise_for_status()
         return io.BytesIO(file_resp.content)
+
     except Exception as e:
         st.warning(f"SharePoint 연결 실패, 로컬 파일로 전환합니다: {e}")
         return None
