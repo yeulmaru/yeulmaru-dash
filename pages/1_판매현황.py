@@ -714,7 +714,13 @@ if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in 
     perf_list = trend_df['공연명'].unique().tolist()
     _default_perfs = [p for p in _active_perf_names if p in perf_list] or perf_list
 
-    # ── 커스텀 체크리스트 CSS ──
+    # ── 공연 체크리스트 (단일 session_state — 위젯 key 직접 사용) ──
+    # 초기값 설정 (첫 로드 시만)
+    for p in _default_perfs:
+        _cbk = f"_trend_cb_{p}"
+        if _cbk not in st.session_state:
+            st.session_state[_cbk] = True
+
     st.markdown("""
     <style>
     .perf-checklist {
@@ -722,49 +728,36 @@ if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in 
         border-radius: 4px;
         overflow: hidden;
     }
-    .perf-row-on {
-        background: rgba(0,255,2,0.08);
+    .perf-cl-row {
         padding: 4px 10px;
         font-size: 13px;
-        color: #0FFD02;
         display: flex;
         align-items: center;
         gap: 12px;
         border-bottom: 1px solid rgba(255,255,255,0.1);
     }
-    .perf-row-off {
-        background: rgba(255,255,255,0.02);
-        padding: 4px 10px;
-        font-size: 13px;
-        color: #666;
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        border-bottom: 1px solid rgba(255,255,255,0.1);
-    }
-    .perf-checklist > div:last-child .perf-row-on,
-    .perf-checklist > div:last-child .perf-row-off { border-bottom: none; }
+    .perf-cl-row.on { background: rgba(0,255,2,0.08); color: #0FFD02; }
+    .perf-cl-row.off { background: rgba(255,255,255,0.02); color: #666; }
+    .perf-checklist > div:last-child .perf-cl-row { border-bottom: none; }
     .perf-date { min-width: 140px; }
     </style>
     """, unsafe_allow_html=True)
 
-    # ── 공연 체크리스트 (체크 상태 수집) ──
-    _perf_checks = {}
+    # 체크박스 렌더 + 상태 수집 (한 번만)
     for pname in _default_perfs:
-        cb_key = f"_trend_cb_{pname}"
-        _perf_checks[pname] = st.checkbox(pname, value=True, key=cb_key, label_visibility="collapsed")
+        st.checkbox(pname, key=f"_trend_cb_{pname}", label_visibility="collapsed")
 
-    # ── 체크리스트 HTML 렌더링 ──
+    # HTML 시각 렌더링 (체크 상태 반영)
     _cl_html = '<div class="perf-checklist">'
     for pname in _default_perfs:
         date_str = perf_date_map.get(pname, '')
-        checked = _perf_checks[pname]
-        cls = "perf-row-on" if checked else "perf-row-off"
+        checked = st.session_state.get(f"_trend_cb_{pname}", True)
+        cls = "on" if checked else "off"
         icon = "&#9745;" if checked else "&#9744;"
-        icon_color = "#0FFD02" if checked else "#666"
+        icon_c = "#0FFD02" if checked else "#666"
         _cl_html += (
-            f'<div><div class="{cls}">'
-            f'<span style="color:{icon_color};font-size:15px;">{icon}</span>'
+            f'<div><div class="perf-cl-row {cls}">'
+            f'<span style="color:{icon_c};font-size:15px;">{icon}</span>'
             f'<span class="perf-date">{date_str}</span>'
             f'<span>{pname}</span>'
             f'</div></div>'
@@ -772,7 +765,7 @@ if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in 
     _cl_html += '</div>'
     st.markdown(_cl_html, unsafe_allow_html=True)
 
-    selected_perfs = [p for p, v in _perf_checks.items() if v]
+    selected_perfs = [p for p in _default_perfs if st.session_state.get(f"_trend_cb_{p}", True)]
 
     filtered_trend = trend_df[trend_df['공연명'].isin(selected_perfs)].copy()
     filtered_trend['기준일자'] = pd.to_datetime(filtered_trend['기준일자'], errors='coerce')
@@ -803,6 +796,25 @@ if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in 
     if _y_col == '점유율(%)':
         _resample_cols = ['합계좌석', '_오픈석', '점유율(%)']
 
+    # ── Y축 동적 스케일링 함수 ──
+    def _snap_ymax_pct(max_val):
+        """점유율(%) 전용 스냅"""
+        if max_val <= 10: return 15
+        if max_val <= 25: return 30
+        if max_val <= 50: return 60
+        if max_val <= 75: return 85
+        return 100
+
+    def _snap_ymax_general(max_val):
+        """합계좌석/합계금액 등 일반 수치용 스냅 (1.2배 + nice number)"""
+        if max_val <= 0:
+            return 100
+        ceil = max_val * 1.3
+        import math
+        mag = 10 ** math.floor(math.log10(ceil))
+        nice = math.ceil(ceil / mag) * mag
+        return nice
+
     if _y_col in filtered_trend.columns and not filtered_trend.empty:
         if trend_resample == '주별':
             filtered_trend = (
@@ -816,17 +828,32 @@ if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in 
             )
         filtered_trend = filtered_trend.dropna(subset=[_y_col]).sort_values('기준일자')
 
+        # Y축 상한 계산
+        _data_max = filtered_trend[_y_col].max() if not filtered_trend.empty else 0
+        if _y_col == '점유율(%)':
+            _y_upper = _snap_ymax_pct(_data_max)
+        else:
+            _y_upper = _snap_ymax_general(_data_max)
+
         if _y_col == '점유율(%)':
             fig2 = px.line(filtered_trend, x='기준일자', y='점유율(%)', color='공연명', markers=True,
                            hover_data={'합계좌석': ':,', '_오픈석': ':,'})
             fig2.update_layout(xaxis_title="기준일자", yaxis_title="점유율(%)",
-                               yaxis=dict(range=[0, 100]))
+                               yaxis=dict(range=[0, _y_upper]))
             fig2.for_each_trace(lambda t: t.update(
                 hovertemplate='%{x}<br>점유율: %{y:.1f}%<br>판매: %{customdata[0]:,}석 / 오픈: %{customdata[1]:,}석<extra>%{fullData.name}</extra>'
             ))
+            _scale_label = f"※ Y축 최대 {_y_upper}% 기준"
         else:
             fig2 = px.line(filtered_trend, x='기준일자', y=_y_col, color='공연명', markers=True)
-            fig2.update_layout(xaxis_title="기준일자", yaxis_title=_y_col)
+            fig2.update_layout(xaxis_title="기준일자", yaxis_title=_y_col,
+                               yaxis=dict(range=[0, _y_upper]))
+            if _y_col == '합계금액':
+                _scale_label = f"※ Y축 최대 {_y_upper:,.0f} 기준"
+            else:
+                _scale_label = f"※ Y축 최대 {_y_upper:,.0f} 기준"
+
+        st.caption(_scale_label)
         fig2 = apply_common_layout(fig2)
         st.plotly_chart(fig2, use_container_width=True)
     else:
