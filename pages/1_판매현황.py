@@ -591,15 +591,29 @@ if not active_df.empty:
         for t in all_ticks
     ]
 
-    # Y축 라벨: D-day + 공연명 + 공연일
+    # Y축 라벨: 공연명 + 공연일 (D-day는 별도 annotation)
     y_tick_texts = []
-    for name, date_str, color, days in zip(y_labels, y_dates, label_colors, y_ddays):
-        dday_str = fmt_dday(days) if pd.notna(days) else ''
-        dday_color = _label_color(days)
-        line1 = f'<span style="color:{dday_color}">{dday_str}</span>  <span style="color:{color}">{name}</span>'
+    for name, date_str, color in zip(y_labels, y_dates, label_colors):
         if date_str:
-            line1 += f'<br><span style="color:#999;font-size:10px">{"&nbsp;" * 8}{date_str}</span>'
-        y_tick_texts.append(line1)
+            y_tick_texts.append(
+                f'<span style="color:{color}">{name}</span><br>'
+                f'<span style="color:#999;font-size:10px">{date_str}</span>'
+            )
+        else:
+            y_tick_texts.append(f'<span style="color:{color}">{name}</span>')
+
+    # D-day 별도 annotation 열 (Y축 왼쪽에 정렬)
+    for i, days in enumerate(y_ddays):
+        if pd.notna(days):
+            dday_str = fmt_dday(days)
+            dday_color = _label_color(days)
+            fig.add_annotation(
+                x=-0.01, y=y_labels[i], xref="paper", yref="y",
+                xanchor="right",
+                text=f'<b>{dday_str}</b>',
+                showarrow=False,
+                font=dict(size=12, color=dday_color),
+            )
 
     # 범례 (차트 영역 밖 상단, 가로 배치)
     legend_text = (
@@ -613,7 +627,7 @@ if not active_df.empty:
         '<span style="color:#555">─</span> <span style="color:#AAA">D-28</span>'
     )
     fig.add_annotation(
-        x=0.5, y=1.12, xref="paper", yref="paper",
+        x=0.5, y=1.15, xref="paper", yref="paper",
         xanchor="center", yanchor="bottom",
         text=legend_text, showarrow=False,
         font=dict(size=10, color="#AAA"),
@@ -623,7 +637,7 @@ if not active_df.empty:
     fig.update_layout(
         xaxis_title="", yaxis_title="",
         height=550,
-        margin=dict(t=90),
+        margin=dict(t=100, l=60),
         xaxis=dict(
             tickvals=all_ticks, ticktext=tick_texts,
             showgrid=True, gridcolor="rgba(255,255,255,0.08)", gridwidth=1,
