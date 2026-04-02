@@ -266,11 +266,9 @@ def build_html_table(df, is_active=True):
         seats = int(r['합계좌석']) if pd.notna(r['합계좌석']) else 0
         base_s = int(r['오픈석']) if pd.notna(r.get('오픈석')) else FALLBACK_SEAT
         rounds = int(r['_회차수']) if pd.notna(r.get('_회차수')) else 1
-        # 오픈석(누적) 표시: 1회차 "926석", 2이상 "926×4"
-        if rounds > 1:
-            open_str = f"{base_s:,}×{rounds}"
-        else:
-            open_str = f"{base_s:,}석"
+        # 오픈석(누적) 표시: 결과값만 (예: "5,556석")
+        total_open_seats = base_s * rounds
+        open_str = f"{total_open_seats:,}석"
         money = r['합계금액'] if pd.notna(r['합계금액']) else 0
         occ = fmt_occupancy(r.get('점유율'))
         diff_str = fmt_daily_diff(r['공연명'])
