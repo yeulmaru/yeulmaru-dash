@@ -466,7 +466,8 @@ if not active_df.empty:
 
     y_labels = chart_df['공연명'].tolist()
     y_dates = [perf_date_map.get(name, '') for name in y_labels]
-    label_colors = [_label_color(d) for d in chart_df['_days']]
+    y_ddays = chart_df['_days'].tolist()
+    label_colors = [_label_color(d) for d in y_ddays]
 
     # D-28 경계 인덱스
     separator_y = None
@@ -525,12 +526,13 @@ if not active_df.empty:
                 layer="below",
             )
 
-    # 막대 바깥 텍스트 (annotation으로 강조색 적용)
+    # 막대 바깥 텍스트 (annotation으로 강조색 적용 + thin space 자간)
     G = '#0FFD02'
+    S = '\u2009'  # thin space
     for i, (occ, sold, total) in enumerate(bar_text_data):
         html_text = (
             f'<span style="color:{G}">{occ:.1f}</span>%'
-            f' (<span style="color:{G}">{sold:,}</span>/{total:,})'
+            f'{S}({S}<span style="color:{G}">{sold:,}</span>{S}/{S}{total:,}{S})'
         )
         fig.add_annotation(
             x=occ + 1, y=y_labels[i], yref="y",
@@ -589,55 +591,52 @@ if not active_df.empty:
         for t in all_ticks
     ]
 
-    # Y축 라벨: 공연명 + 공연일 (줄바꿈)
+    # Y축 라벨: D-day + 공연명 + 공연일
     y_tick_texts = []
-    for name, date_str, color in zip(y_labels, y_dates, label_colors):
+    for name, date_str, color, days in zip(y_labels, y_dates, label_colors, y_ddays):
+        dday_str = fmt_dday(days) if pd.notna(days) else ''
+        dday_color = _label_color(days)
+        line1 = f'<span style="color:{dday_color}">{dday_str}</span>  <span style="color:{color}">{name}</span>'
         if date_str:
-            y_tick_texts.append(
-                f'<span style="color:{color}">{name}</span><br>'
-                f'<span style="color:#999;font-size:10px">{date_str}</span>'
-            )
-        else:
-            y_tick_texts.append(f'<span style="color:{color}">{name}</span>')
+            line1 += f'<br><span style="color:#999;font-size:10px">{"&nbsp;" * 8}{date_str}</span>'
+        y_tick_texts.append(line1)
 
-    # 범례 (차트 우측 상단 annotation)
+    # 범례 (차트 영역 밖 상단, 가로 배치)
     legend_text = (
         '<span style="color:#AAA">■ 달성률</span>  '
         '<span style="color:#FFFFFF">● 75%↑</span>  '
         '<span style="color:#FFD700">● 50~75%</span>  '
         '<span style="color:#FF8C00">● 25~50%</span>  '
-        '<span style="color:#FF4B4B">● ~25%</span><br>'
-        '<span style="color:#FFD700">┆</span> <span style="color:#AAA">공연별 목표</span>  '
+        '<span style="color:#FF4B4B">● ~25%</span>    '
+        '<span style="color:#FFD700">┆</span> <span style="color:#AAA">목표</span>  '
         '<span style="color:#FF4B4B">┆</span> <span style="color:#AAA">100%</span>  '
         '<span style="color:#555">─</span> <span style="color:#AAA">D-28</span>'
     )
     fig.add_annotation(
-        x=1.0, y=1.0, xref="paper", yref="paper",
-        xanchor="right", yanchor="top",
+        x=0.5, y=1.12, xref="paper", yref="paper",
+        xanchor="center", yanchor="bottom",
         text=legend_text, showarrow=False,
         font=dict(size=10, color="#AAA"),
-        bgcolor="rgba(0,0,0,0.7)", bordercolor="#333", borderwidth=1, borderpad=6,
+        bgcolor="rgba(0,0,0,0.5)", bordercolor="#333", borderwidth=1, borderpad=5,
     )
 
     fig.update_layout(
-        xaxis_title=dict(text="점유율 (%)", standoff=5),
-        yaxis_title="",
+        xaxis_title="", yaxis_title="",
+        height=550,
+        margin=dict(t=90),
         xaxis=dict(
             tickvals=all_ticks, ticktext=tick_texts,
             showgrid=True, gridcolor="rgba(255,255,255,0.08)", gridwidth=1,
-            title_standoff=5,
-            side="bottom",
         ),
         yaxis=dict(ticktext=y_tick_texts, tickvals=y_labels, showgrid=False),
     )
-    # X축 라벨을 좌측 하단에 배치
+    # X축 라벨을 우측 하단에 배치
     fig.add_annotation(
-        x=0, y=-0.08, xref="paper", yref="paper",
-        xanchor="left", yanchor="top",
+        x=1.0, y=-0.07, xref="paper", yref="paper",
+        xanchor="right", yanchor="top",
         text="점유율 (%)", showarrow=False,
-        font=dict(size=12, color="#AAA"),
+        font=dict(size=11, color="#AAA"),
     )
-    fig.update_layout(xaxis_title="")  # 기본 중앙 타이틀 제거
 
     fig = apply_common_layout(fig)
     st.plotly_chart(fig, use_container_width=True)
