@@ -897,10 +897,6 @@ if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in 
         cat_selected = [p for p in cat_perfs if p in selected_perfs]
         cat_data = filtered_trend[filtered_trend['공연명'].isin(cat_selected)]
         with container:
-            st.markdown(
-                f'<div style="{_LABEL_STYLE}">{title}</div>',
-                unsafe_allow_html=True,
-            )
             if cat_data.empty or _y_col not in cat_data.columns:
                 st.caption("데이터 없음")
                 return
@@ -945,14 +941,14 @@ if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in 
 
             fig.update_layout(
                 xaxis_title="", yaxis_title="", height=400,
-                margin=dict(t=40, b=30, l=50, r=20),
+                margin=dict(t=50, b=30, l=50, r=20),
                 showlegend=False,
                 yaxis=dict(range=[0, _y_upper], tickvals=_yticks, ticktext=_ytick_texts),
             )
-            # Y축 라벨을 좌측 상단에 가로 배치
+            # Y축 라벨: plot area 바깥 상단, Y축 숫자 왼쪽 정렬선 기준
             fig.add_annotation(
                 text=_yaxis_label, xref='paper', yref='paper',
-                x=0, y=1.06, showarrow=False, xanchor='left',
+                x=-0.02, y=1.08, showarrow=False, xanchor='left', yanchor='bottom',
                 font=dict(size=11, color='#AAA'),
             )
             fig = apply_common_layout(fig)
