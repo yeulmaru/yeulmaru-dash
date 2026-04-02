@@ -750,7 +750,7 @@ if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in 
         _x_max = active_df['공연일(날짜)'].max()
 
     # ── 영역2: 공통 컨트롤 ──
-    _ctrl1, _ctrl2, _ctrl_spacer = st.columns([1.5, 1.5, 5])
+    _ctrl1, _ctrl2, _ctrl_spacer = st.columns([2.5, 1.5, 4])
     _LBL = 'font-size:15px;font-weight:bold;color:#0FFD02;margin:0 0 2px 0;'
     with _ctrl1:
         st.markdown(f'<div style="{_LBL}">지표 선택</div>', unsafe_allow_html=True)
