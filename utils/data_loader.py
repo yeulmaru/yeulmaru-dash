@@ -155,12 +155,23 @@ def get_base_date():
     if not source:
         return None
     try:
+        # 1차: B2 셀 직접 읽기
         df = pd.read_excel(source, sheet_name='일일입력', nrows=2, header=None)
         val = df.iloc[1, 1]
         try:
             return pd.to_datetime(str(int(val)), format='%Y%m%d')
-        except:
-            return val
+        except (ValueError, TypeError):
+            pass
+
+        # 2차: B2가 수식(nan)이면 로그 행의 최신 날짜(No=yyyymmdd)에서 추출
+        source2 = get_excel_data()
+        df_full = pd.read_excel(source2, sheet_name='일일입력', skiprows=3)
+        no_num = pd.to_numeric(df_full['No'], errors='coerce')
+        date_nos = no_num[(no_num > 20000000) & (no_num < 30000000)]
+        if not date_nos.empty:
+            return pd.to_datetime(str(int(date_nos.max())), format='%Y%m%d')
+
+        return val
     except Exception:
         return None
 

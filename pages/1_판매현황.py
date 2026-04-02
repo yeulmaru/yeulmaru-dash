@@ -69,22 +69,11 @@ def _match_master(perf_name, master_df):
 # 당일 데이터(No < 100)
 today_rows = daily_df[daily_df['_sort_key'] < 100]
 
-# 공연일 기간 맵: 같은 공연의 min~max 날짜
-perf_date_map = {}
-if '공연일(날짜)' in today_rows.columns:
-    for name, grp in today_rows.groupby('공연명'):
-        dates = pd.to_datetime(grp['공연일(날짜)'], errors='coerce').dropna().sort_values()
-        if dates.empty:
-            perf_date_map[name] = ''
-        elif dates.iloc[0] == dates.iloc[-1]:
-            perf_date_map[name] = f"{dates.iloc[0].month}.{dates.iloc[0].day}"
-        else:
-            perf_date_map[name] = f"{dates.iloc[0].month}.{dates.iloc[0].day}~{dates.iloc[-1].month}.{dates.iloc[-1].day}"
-
 grouped = daily_df.sort_values('_sort_key').groupby('공연명').last().reset_index()
 
-# 공연마스터 기반 오픈석 계산
+# 공연마스터 기반 오픈석 + 공연일 계산
 _debug_match = []
+perf_date_map = {}
 for idx, row in grouped.iterrows():
     name = row['공연명']
     matched = _match_master(name, master_df)
@@ -93,6 +82,16 @@ for idx, row in grouped.iterrows():
         rounds = int(matched['총회차']) if pd.notna(matched['총회차']) and matched['총회차'] > 0 else 1
         total_open = int(matched['총오픈석']) if pd.notna(matched['총오픈석']) and matched['총오픈석'] > 0 else base_seat * rounds
         match_status = str(matched['사업명'])
+
+        # 공연일(날짜): 수식 셀이 nan이면 공연마스터 시작일/종료일 사용
+        start_dt = pd.to_datetime(matched.get('시작일'), errors='coerce')
+        end_dt = pd.to_datetime(matched.get('종료일'), errors='coerce')
+        if pd.notna(start_dt):
+            grouped.at[idx, '공연일(날짜)'] = start_dt
+            if pd.notna(end_dt) and start_dt != end_dt:
+                perf_date_map[name] = f"{start_dt.month}.{start_dt.day}~{end_dt.month}.{end_dt.day}"
+            else:
+                perf_date_map[name] = f"{start_dt.month}.{start_dt.day}"
     else:
         base_seat = FALLBACK_SEAT
         rounds = 1
@@ -125,6 +124,21 @@ for i, row in grouped.iterrows():
 # ── 디버그: 공연마스터 매칭 결과 ──
 with st.sidebar.expander("디버그: 공연마스터 매칭"):
     st.dataframe(pd.DataFrame(_debug_match), use_container_width=True, hide_index=True)
+
+# ── 디버그: Raw 데이터 확인 ──
+with st.sidebar.expander("디버그: Raw 데이터"):
+    st.write(f"**base_date raw:** `{repr(base_date)}`")
+    st.write(f"**daily_df:** {daily_df.shape[0]}행 × {daily_df.shape[1]}열")
+    st.write(f"**컬럼:** {list(daily_df.columns)}")
+    st.write("**daily_df 처음 5행:**")
+    st.dataframe(daily_df.head(5), use_container_width=True, hide_index=True)
+    if master_df is not None:
+        st.write(f"**공연마스터:** {master_df.shape[0]}행")
+        st.dataframe(master_df[['사업명', '시작일', '종료일', '기준석', '총회차']].head(), use_container_width=True, hide_index=True)
+    else:
+        st.write("**공연마스터:** None")
+    st.write(f"**grouped 공연일(날짜):**")
+    st.dataframe(grouped[['공연명', '공연일(날짜)']].head(), use_container_width=True, hide_index=True)
 
 # ── 전일대비 계산 (판매추이 시트에서 최신 2일치 비교) ──
 daily_diff = {}
