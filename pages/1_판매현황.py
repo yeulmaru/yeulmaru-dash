@@ -744,11 +744,17 @@ if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in 
 
     _LABEL_STYLE = 'font-size:15px;font-weight:bold;color:#0FFD02;margin:0 0 2px 0;'
 
-    # ── data_editor 컴팩트 CSS ──
+    # ── data_editor 컴팩트 + 홀짝 행 CSS ──
     st.markdown("""
     <style>
     [data-testid="stDataFrame"] [data-testid="glideDataEditor"] {
         font-size: 13px !important;
+    }
+    [data-testid="stDataFrame"] tbody tr:nth-child(even) {
+        background-color: rgba(255,255,255,0.06) !important;
+    }
+    [data-testid="stDataFrame"] tbody tr:nth-child(odd) {
+        background-color: rgba(255,255,255,0.01) !important;
     }
     </style>
     """, unsafe_allow_html=True)
