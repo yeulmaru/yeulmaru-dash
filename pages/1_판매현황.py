@@ -7,7 +7,7 @@ import sys
 import os
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from utils.data_loader import load_daily_input, load_sales_trend, get_base_date
+from utils.data_loader import load_daily_input, load_sales_trend, get_base_date, load_performance_master
 from utils.charts import COLORS, apply_common_layout
 
 st.set_page_config(page_title="실시간 판매현황", page_icon="📊", layout="wide")
@@ -56,10 +56,24 @@ if '공연명' not in daily_df.columns:
 
 daily_df['_sort_key'] = pd.to_numeric(daily_df['No'], errors='coerce')
 
-# ── 오픈석 보정: 기본좌석 × 회차수 (엑셀 원본값 무시, 무조건 재계산) ──
-# 당일 데이터(No < 100)에서 같은 공연명의 행 수 = 회차수
+# ── 공연마스터 로드 & 매칭 ──
+master_df = load_performance_master()
+
+FALLBACK_SEAT = 926  # 공연마스터 매칭 실패 시 기본값
+
+def _match_master(perf_name, master_df):
+    """일일입력 공연명 ↔ 공연마스터 사업명 매칭 (contains 양방향)"""
+    if master_df is None or master_df.empty:
+        return None
+    perf_name_s = str(perf_name).strip()
+    for _, mr in master_df.iterrows():
+        master_name = str(mr['사업명']).strip()
+        if perf_name_s == master_name or perf_name_s in master_name or master_name in perf_name_s:
+            return mr
+    return None
+
+# 당일 데이터(No < 100)
 today_rows = daily_df[daily_df['_sort_key'] < 100]
-round_count_map = today_rows.groupby('공연명').size().to_dict()
 
 # 공연일 기간 맵: 같은 공연의 min~max 날짜
 perf_date_map = {}
@@ -73,36 +87,50 @@ if '공연일(날짜)' in today_rows.columns:
         else:
             perf_date_map[name] = f"{dates.iloc[0].month}.{dates.iloc[0].day}~{dates.iloc[-1].month}.{dates.iloc[-1].day}"
 
-BASE_SEAT_DEFAULT = 926  # 대극장 기본좌석
-
 grouped = daily_df.sort_values('_sort_key').groupby('공연명').last().reset_index()
 
-# 오픈석 / 누적오픈석 분리 계산
+# 공연마스터 기반 오픈석 계산
+_debug_match = []
 for idx, row in grouped.iterrows():
     name = row['공연명']
-    rounds = round_count_map.get(name, 1)
-    grouped.at[idx, '오픈석'] = BASE_SEAT_DEFAULT
-    grouped.at[idx, '누적오픈석'] = BASE_SEAT_DEFAULT * rounds
+    matched = _match_master(name, master_df)
+    if matched is not None:
+        base_seat = int(matched['기준석']) if pd.notna(matched['기준석']) and matched['기준석'] > 0 else FALLBACK_SEAT
+        rounds = int(matched['총회차']) if pd.notna(matched['총회차']) and matched['총회차'] > 0 else 1
+        total_open = int(matched['총오픈석']) if pd.notna(matched['총오픈석']) and matched['총오픈석'] > 0 else base_seat * rounds
+        match_status = str(matched['사업명'])
+    else:
+        base_seat = FALLBACK_SEAT
+        rounds = 1
+        total_open = FALLBACK_SEAT
+        match_status = '(미매칭)'
+
+    grouped.at[idx, '오픈석'] = base_seat
+    grouped.at[idx, '누적오픈석'] = total_open
     grouped.at[idx, '_회차수'] = rounds
 
-# 점유율: 누적오픈석 기준
+    _debug_match.append({
+        '공연명': name,
+        '매칭': match_status,
+        '기준석': base_seat,
+        '총회차': rounds,
+        '총오픈석': total_open,
+        '합계좌석': int(row['합계좌석']) if pd.notna(row['합계좌석']) else 0,
+    })
+
+# 점유율: 총오픈석 기준
 grouped['점유율'] = (
     grouped['합계좌석'] / grouped['누적오픈석'].replace(0, float('nan')) * 100
 ).fillna(0).clip(upper=100.0)
 
-# ── 디버그: 오픈석 보정 결과 ──
-with st.sidebar.expander("디버그: 오픈석 보정"):
-    debug_rows = []
-    for _, r in grouped.iterrows():
-        debug_rows.append({
-            '공연명': r['공연명'],
-            '회차수': int(r['_회차수']),
-            '기본좌석': BASE_SEAT_DEFAULT,
-            '누적오픈석': int(r['누적오픈석']),
-            '합계좌석': int(r['합계좌석']) if pd.notna(r['합계좌석']) else 0,
-            '점유율': f"{r['점유율']:.1f}%",
-        })
-    st.dataframe(pd.DataFrame(debug_rows), use_container_width=True, hide_index=True)
+# 디버그에 점유율 추가
+for i, row in grouped.iterrows():
+    if i < len(_debug_match):
+        _debug_match[i]['점유율'] = f"{row['점유율']:.1f}%"
+
+# ── 디버그: 공연마스터 매칭 결과 ──
+with st.sidebar.expander("디버그: 공연마스터 매칭"):
+    st.dataframe(pd.DataFrame(_debug_match), use_container_width=True, hide_index=True)
 
 # ── 전일대비 계산 (판매추이 시트에서 최신 2일치 비교) ──
 daily_diff = {}
@@ -219,12 +247,13 @@ def build_html_table(df, is_active=True):
         days = r.get('_days')
         dday_col = _dday_color(days)
         seats = int(r['합계좌석']) if pd.notna(r['합계좌석']) else 0
+        base_s = int(r['오픈석']) if pd.notna(r.get('오픈석')) else FALLBACK_SEAT
         rounds = int(r['_회차수']) if pd.notna(r.get('_회차수')) else 1
-        # 오픈석(누적) 표시: 1회차 "926석", 2이상 "926×6"
+        # 오픈석(누적) 표시: 1회차 "926석", 2이상 "926×4"
         if rounds > 1:
-            open_str = f"{BASE_SEAT_DEFAULT:,}×{rounds}"
+            open_str = f"{base_s:,}×{rounds}"
         else:
-            open_str = f"{BASE_SEAT_DEFAULT:,}석"
+            open_str = f"{base_s:,}석"
         money = r['합계금액'] if pd.notna(r['합계금액']) else 0
         occ = fmt_occupancy(r.get('점유율'))
         diff_str = fmt_daily_diff(r['공연명'])

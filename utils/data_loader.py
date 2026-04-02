@@ -124,6 +124,32 @@ def get_data_filepath():
 # ── 데이터 로드 함수들 ──
 
 @st.cache_data(ttl=60)
+def load_performance_master():
+    """공연마스터 시트를 읽어서 DataFrame 반환"""
+    source = get_excel_data()
+    if not source:
+        return None
+    try:
+        df = pd.read_excel(source, sheet_name='공연마스터')
+        # 총오픈석/가용석이 수식이라 NaN일 수 있으므로 계산으로 보정
+        for col in ['기준석', '총회차']:
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0).astype(int)
+        if '총오픈석' not in df.columns or df['총오픈석'].isna().all():
+            df['총오픈석'] = df['기준석'] * df['총회차']
+        else:
+            df['총오픈석'] = pd.to_numeric(df['총오픈석'], errors='coerce')
+            df['총오픈석'] = df['총오픈석'].fillna(df['기준석'] * df['총회차'])
+        if '가용석' in df.columns:
+            df['가용석'] = pd.to_numeric(df['가용석'], errors='coerce')
+            df['가용석'] = df['가용석'].fillna(df['기준석'])
+        return df
+    except Exception as e:
+        st.warning(f"`공연마스터` 데이터 로드 오류: {e}")
+        return None
+
+
+@st.cache_data(ttl=60)
 def get_base_date():
     source = get_excel_data()
     if not source:
