@@ -14,9 +14,6 @@ check_password()
 
 st.title("📊 실시간 판매현황")
 
-# 캐시 초기화 → SharePoint 최신 데이터 보장
-st.cache_data.clear()
-
 daily_df = load_daily_input()
 trend_df = load_sales_trend()
 base_date = get_base_date()

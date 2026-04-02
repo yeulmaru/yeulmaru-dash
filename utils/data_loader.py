@@ -26,7 +26,7 @@ def get_access_token():
 
 @st.cache_data(ttl=60)
 def download_excel_from_sharepoint():
-    """SharePoint에서 엑셀 파일 다운로드 → BytesIO 반환"""
+    """SharePoint에서 엑셀 파일 다운로드 → raw bytes 반환 (캐싱 안전)"""
     try:
         token = get_access_token()
         headers = {"Authorization": f"Bearer {token}"}
@@ -74,14 +74,14 @@ def download_excel_from_sharepoint():
         if download_url:
             file_resp = requests.get(download_url)
             file_resp.raise_for_status()
-            return io.BytesIO(file_resp.content)
+            return file_resp.content  # raw bytes (immutable, 캐싱 안전)
 
         # downloadUrl 없으면 drive_id + item_id로 다운로드
         item_id = target["id"]
         content_url = f"{graph_base}/drives/{target_drive_id}/items/{item_id}/content"
         file_resp = requests.get(content_url, headers=headers)
         file_resp.raise_for_status()
-        return io.BytesIO(file_resp.content)
+        return file_resp.content  # raw bytes
 
     except Exception as e:
         st.warning(f"SharePoint 연결 실패, 로컬 파일로 전환합니다: {e}")
@@ -92,9 +92,9 @@ def get_excel_data():
     """SharePoint 우선, 실패 시 로컬 data/ 폴더에서 읽기 (fallback)"""
     # SharePoint 시도
     try:
-        excel_bytes = download_excel_from_sharepoint()
-        if excel_bytes:
-            return excel_bytes
+        raw = download_excel_from_sharepoint()
+        if raw:
+            return io.BytesIO(raw)  # 매번 새 BytesIO 생성 → 파일포인터 항상 0
     except:
         pass
 
