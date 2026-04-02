@@ -707,7 +707,7 @@ if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in 
     # ── 컨트롤: 지표 + 일별/주별/월별 토글 ──
     _ctrl1, _ctrl2 = st.columns(2)
     with _ctrl1:
-        trend_metric = st.radio("지표 선택", ['합계좌석', '합계금액'], horizontal=True)
+        trend_metric = st.radio("지표 선택", ['점유율(%)', '합계좌석', '합계금액'], horizontal=True)
     with _ctrl2:
         trend_resample = st.radio("기간 단위", ['일별', '주별', '월별'], index=1, horizontal=True)
 
@@ -784,22 +784,49 @@ if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in 
     if _x_max is not None:
         filtered_trend = filtered_trend[filtered_trend['기준일자'] <= _x_max]
 
+    # ── 점유율 계산: 공연별 오픈석 매핑 후 파생 컬럼 추가 ──
+    _open_seat_map = {}
+    for pname in selected_perfs:
+        matched_m = _match_master(pname, master_df)
+        if matched_m is not None:
+            _open_seat_map[pname] = int(matched_m['총오픈석']) if pd.notna(matched_m.get('총오픈석')) and matched_m['총오픈석'] > 0 else FALLBACK_SEAT
+        else:
+            _open_seat_map[pname] = FALLBACK_SEAT
+
+    if '합계좌석' in filtered_trend.columns:
+        filtered_trend['_오픈석'] = filtered_trend['공연명'].map(_open_seat_map).fillna(FALLBACK_SEAT)
+        filtered_trend['점유율(%)'] = (filtered_trend['합계좌석'] / filtered_trend['_오픈석'] * 100).clip(0, 100)
+
     # ── 리샘플링 (누적값이므로 각 구간의 마지막 값) ──
-    if trend_metric in filtered_trend.columns and not filtered_trend.empty:
+    _y_col = trend_metric
+    _resample_cols = [_y_col]
+    if _y_col == '점유율(%)':
+        _resample_cols = ['합계좌석', '_오픈석', '점유율(%)']
+
+    if _y_col in filtered_trend.columns and not filtered_trend.empty:
         if trend_resample == '주별':
             filtered_trend = (
                 filtered_trend.groupby([pd.Grouper(key='기준일자', freq='W-MON'), '공연명'])
-                [trend_metric].last().reset_index()
+                [_resample_cols].last().reset_index()
             )
         elif trend_resample == '월별':
             filtered_trend = (
                 filtered_trend.groupby([pd.Grouper(key='기준일자', freq='MS'), '공연명'])
-                [trend_metric].last().reset_index()
+                [_resample_cols].last().reset_index()
             )
-        filtered_trend = filtered_trend.dropna(subset=[trend_metric]).sort_values('기준일자')
+        filtered_trend = filtered_trend.dropna(subset=[_y_col]).sort_values('기준일자')
 
-        fig2 = px.line(filtered_trend, x='기준일자', y=trend_metric, color='공연명', markers=True)
-        fig2.update_layout(xaxis_title="기준일자", yaxis_title=trend_metric)
+        if _y_col == '점유율(%)':
+            fig2 = px.line(filtered_trend, x='기준일자', y='점유율(%)', color='공연명', markers=True,
+                           hover_data={'합계좌석': ':,', '_오픈석': ':,'})
+            fig2.update_layout(xaxis_title="기준일자", yaxis_title="점유율(%)",
+                               yaxis=dict(range=[0, 100]))
+            fig2.for_each_trace(lambda t: t.update(
+                hovertemplate='%{x}<br>점유율: %{y:.1f}%<br>판매: %{customdata[0]:,}석 / 오픈: %{customdata[1]:,}석<extra>%{fullData.name}</extra>'
+            ))
+        else:
+            fig2 = px.line(filtered_trend, x='기준일자', y=_y_col, color='공연명', markers=True)
+            fig2.update_layout(xaxis_title="기준일자", yaxis_title=_y_col)
         fig2 = apply_common_layout(fig2)
         st.plotly_chart(fig2, use_container_width=True)
     else:
