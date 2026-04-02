@@ -4,7 +4,7 @@ import plotly.graph_objects as go
 import plotly.express as px
 from datetime import datetime
 
-from utils.data_loader import load_daily_input, load_sales_trend, get_base_date, load_performance_master
+from utils.data_loader import load_daily_input, load_sales_trend, get_base_date, load_performance_master, load_round_details
 from utils.charts import COLORS, apply_common_layout
 
 st.set_page_config(page_title="실시간 판매현황", page_icon="📊", layout="wide")
@@ -50,10 +50,13 @@ if '공연명' not in daily_df.columns:
 
 daily_df['_sort_key'] = pd.to_numeric(daily_df['No'], errors='coerce')
 
-# ── 공연마스터 로드 & 매칭 ──
+# ── 공연마스터 · 회차상세 로드 ──
 master_df = load_performance_master()
+rounds_df = load_round_details()
 
 FALLBACK_SEAT = 926  # 공연마스터 매칭 실패 시 기본값
+WEEKDAYS_KR = ['월', '화', '수', '목', '금', '토', '일']
+
 
 def _match_master(perf_name, master_df):
     """일일입력 공연명 ↔ 공연마스터 사업명 매칭 (contains 양방향)"""
@@ -65,6 +68,41 @@ def _match_master(perf_name, master_df):
         if perf_name_s == master_name or perf_name_s in master_name or master_name in perf_name_s:
             return mr
     return None
+
+
+def _fmt_perf_dates(dates):
+    """공연일 목록 → 요일 포함 포맷.
+    단일일: "5.7(목)"  연속: "4.16(수)~19(토)"  비연속: "5.14(수)~16(금), 5.23(토)"
+    """
+    dates = sorted(set(dates))
+    if not dates:
+        return ''
+
+    # 연속 날짜 그룹으로 묶기
+    groups = []
+    cur = [dates[0]]
+    for d in dates[1:]:
+        if (d - cur[-1]).days == 1:
+            cur.append(d)
+        else:
+            groups.append(cur)
+            cur = [d]
+    groups.append(cur)
+
+    parts = []
+    for g in groups:
+        first, last = g[0], g[-1]
+        fw = WEEKDAYS_KR[first.weekday()]
+        if first == last:
+            parts.append(f"{first.month}.{first.day}({fw})")
+        else:
+            lw = WEEKDAYS_KR[last.weekday()]
+            if first.month == last.month:
+                parts.append(f"{first.month}.{first.day}({fw})~{last.day}({lw})")
+            else:
+                parts.append(f"{first.month}.{first.day}({fw})~{last.month}.{last.day}({lw})")
+    return ', '.join(parts)
+
 
 # 당일 데이터(No < 100)
 today_rows = daily_df[daily_df['_sort_key'] < 100]
@@ -86,16 +124,28 @@ for idx, row in grouped.iterrows():
         rounds = int(matched['총회차']) if pd.notna(matched['총회차']) and matched['총회차'] > 0 else 1
         total_open = int(matched['총오픈석']) if pd.notna(matched['총오픈석']) and matched['총오픈석'] > 0 else base_seat * rounds
         match_status = str(matched['사업명'])
+        perf_id = matched.get('ID')
 
-        # 공연일(날짜): 수식 셀이 nan이면 공연마스터 시작일/종료일 사용
+        # 공연일: 회차상세에서 날짜 목록 가져와서 요일 포함 포맷
+        if rounds_df is not None and perf_id:
+            rd = rounds_df[rounds_df['ID'] == perf_id]
+            rd_dates = rd['공연일'].dropna().tolist()
+            if rd_dates:
+                perf_date_map[name] = _fmt_perf_dates(rd_dates)
+
+        # 공연일(날짜): 수식 셀이 nan이면 공연마스터 시작일 사용
         start_dt = pd.to_datetime(matched.get('시작일'), errors='coerce')
-        end_dt = pd.to_datetime(matched.get('종료일'), errors='coerce')
         if pd.notna(start_dt):
             grouped.at[idx, '공연일(날짜)'] = start_dt
-            if pd.notna(end_dt) and start_dt != end_dt:
-                perf_date_map[name] = f"{start_dt.month}.{start_dt.day}~{end_dt.month}.{end_dt.day}"
-            else:
-                perf_date_map[name] = f"{start_dt.month}.{start_dt.day}"
+            # 회차상세에서 못 가져왔으면 시작일/종료일로 fallback
+            if name not in perf_date_map:
+                end_dt = pd.to_datetime(matched.get('종료일'), errors='coerce')
+                sw = WEEKDAYS_KR[start_dt.weekday()]
+                if pd.notna(end_dt) and start_dt != end_dt:
+                    ew = WEEKDAYS_KR[end_dt.weekday()]
+                    perf_date_map[name] = f"{start_dt.month}.{start_dt.day}({sw})~{end_dt.day}({ew})"
+                else:
+                    perf_date_map[name] = f"{start_dt.month}.{start_dt.day}({sw})"
     else:
         base_seat = FALLBACK_SEAT
         rounds = 1
@@ -131,18 +181,19 @@ with st.sidebar.expander("디버그: 공연마스터 매칭"):
 
 # ── 디버그: Raw 데이터 확인 ──
 with st.sidebar.expander("디버그: Raw 데이터"):
-    st.write(f"**base_date raw:** `{repr(base_date)}`")
+    st.write(f"**갱신일자 (base_date):** `{repr(base_date)}` (누적기록 max 기준일자)")
     st.write(f"**daily_df:** {daily_df.shape[0]}행 × {daily_df.shape[1]}열")
-    st.write(f"**컬럼:** {list(daily_df.columns)}")
+    st.write(f"**trend_df:** {trend_df.shape[0] if trend_df is not None else 'None'}행")
+    if trend_df is not None and '기준일자' in trend_df.columns:
+        st.write(f"**trend 날짜 범위:** {trend_df['기준일자'].min()} ~ {trend_df['기준일자'].max()}")
     st.write("**daily_df 처음 5행:**")
     st.dataframe(daily_df.head(5), use_container_width=True, hide_index=True)
     if master_df is not None:
         st.write(f"**공연마스터:** {master_df.shape[0]}행")
         st.dataframe(master_df[['사업명', '시작일', '종료일', '기준석', '총회차']].head(), use_container_width=True, hide_index=True)
-    else:
-        st.write("**공연마스터:** None")
-    st.write(f"**grouped 공연일(날짜):**")
-    st.dataframe(grouped[['공연명', '공연일(날짜)']].head(), use_container_width=True, hide_index=True)
+    st.write(f"**공연일 포맷:**")
+    for k, v in perf_date_map.items():
+        st.write(f"  {k[:20]}… → {v}")
 
 # ── 전일대비 계산 (누적기록의 전일대비(석) 컬럼 또는 최신 2일치 비교) ──
 daily_diff = {}
@@ -243,22 +294,17 @@ def _dday_zone(days):
 
 def build_html_table(df, is_active=True):
     """HTML 테이블 생성"""
-    if is_active:
-        headers = ['공연일', '공연명', 'D-day', '판매좌석', '오픈석(누적)', '점유율(%)', '합계금액', '전일대비']
-        right_align_cols = {3, 4, 5, 6, 7}
-    else:
-        headers = ['공연일', '공연명', 'D-day', '판매좌석', '오픈석(누적)', '최종 점유율(%)', '합계금액', '전일대비']
-        right_align_cols = {3, 4, 5, 6, 7}
+    occ_label = '점유율(%)' if is_active else '최종 점유율(%)'
+    headers = ['공연일', '공연명', 'D-day', '판매좌석', '전일대비', '오픈석(누적)', occ_label, '합계금액']
+    right_align_cols = {3, 4, 5, 6, 7}
 
     html = '<table style="width:100%;border-collapse:collapse;font-size:14px;">'
-    # 헤더
     html += '<tr>'
     for i, h in enumerate(headers):
         align = 'right' if i in right_align_cols else 'left'
         html += f'<th style="text-align:{align};padding:8px 12px;border-bottom:2px solid #444;color:#AAA;font-weight:600;">{h}</th>'
     html += '</tr>'
 
-    # 행 — D-day 구간 경계에 구분선 삽입
     prev_zone = None
     for _, r in df.iterrows():
         days = r.get('_days')
@@ -266,7 +312,6 @@ def build_html_table(df, is_active=True):
         seats = int(r['합계좌석']) if pd.notna(r['합계좌석']) else 0
         base_s = int(r['오픈석']) if pd.notna(r.get('오픈석')) else FALLBACK_SEAT
         rounds = int(r['_회차수']) if pd.notna(r.get('_회차수')) else 1
-        # 오픈석(누적) 표시: 결과값만 (예: "5,556석")
         total_open_seats = base_s * rounds
         open_str = f"{total_open_seats:,}석"
         money = r['합계금액'] if pd.notna(r['합계금액']) else 0
@@ -275,7 +320,6 @@ def build_html_table(df, is_active=True):
         money_str = fmt_money_man(money)
         date_str = perf_date_map.get(r['공연명'], '')
 
-        # 구간 경계 구분선 (D-14, D-28 경계)
         cur_zone = _dday_zone(days) if is_active else -1
         if is_active and prev_zone is not None and cur_zone != prev_zone:
             border_top = 'border-top:2px solid #555;'
@@ -288,7 +332,7 @@ def build_html_table(df, is_active=True):
         html += f'<td style="padding:8px 12px;color:#AAA;">{date_str}</td>'
         # 공연명
         html += f'<td style="padding:8px 12px;color:{dday_col};">{r["공연명"]}</td>'
-        # D-day / 공연일(종료)
+        # D-day
         if is_active:
             html += f'<td style="padding:8px 12px;color:{dday_col};">{fmt_dday(days)}</td>'
         else:
@@ -296,16 +340,16 @@ def build_html_table(df, is_active=True):
             if '공연일(날짜)' in r.index and pd.notna(r['공연일(날짜)']):
                 dt_str = pd.to_datetime(r['공연일(날짜)']).strftime('%Y-%m-%d')
             html += f'<td style="padding:8px 12px;">{dt_str}</td>'
-        # 판매좌석 (강조)
+        # 판매좌석
         html += f'<td style="padding:8px 12px;text-align:right;color:{ACCENT};font-weight:600;">{seats:,}석</td>'
+        # 전일대비
+        html += f'<td style="padding:8px 12px;text-align:right;color:{ACCENT};font-weight:600;">{diff_str}</td>'
         # 오픈석(누적)
         html += f'<td style="padding:8px 12px;text-align:right;">{open_str}</td>'
-        # 점유율 (강조)
+        # 점유율
         html += f'<td style="padding:8px 12px;text-align:right;color:{ACCENT};font-weight:600;">{occ}</td>'
-        # 합계금액 (기본)
+        # 합계금액
         html += f'<td style="padding:8px 12px;text-align:right;">{money_str}</td>'
-        # 전일대비 (강조)
-        html += f'<td style="padding:8px 12px;text-align:right;color:{ACCENT};font-weight:600;">{diff_str}</td>'
         html += '</tr>'
 
     html += '</table>'

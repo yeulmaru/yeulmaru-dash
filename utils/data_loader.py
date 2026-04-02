@@ -150,6 +150,20 @@ def load_performance_master():
 
 
 @st.cache_data(ttl=60)
+def load_round_details():
+    """회차상세 시트를 읽어서 DataFrame 반환"""
+    source = get_excel_data()
+    if not source:
+        return None
+    try:
+        df = pd.read_excel(source, sheet_name='회차상세')
+        df['공연일'] = pd.to_datetime(df['공연일'], errors='coerce')
+        return df
+    except Exception:
+        return None
+
+
+@st.cache_data(ttl=60)
 def get_base_date():
     """누적기록(행16~)의 최신 기준일자를 갱신일자로 반환."""
     source = get_excel_data()
