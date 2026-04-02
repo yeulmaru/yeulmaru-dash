@@ -649,20 +649,96 @@ if not active_df.empty:
 st.markdown("---")
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-# 판매추이 (기존 유지)
+# 판매추이 (판매중 공연만)
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in trend_df.columns:
     st.subheader("📈 판매추이")
 
-    trend_metric = st.radio("지표 선택", ['합계좌석', '합계금액'], horizontal=True)
+    # ── 판매중 공연 목록 결정 ──
+    # 1차: 공연마스터에 '상태' 컬럼이 있으면 '판매중'인 공연
+    # 2차: 판매현황 테이블의 active_df (공연일 >= 오늘) 상위 6개
+    _active_perf_names = []
+    if master_df is not None and '상태' in master_df.columns:
+        selling = master_df[master_df['상태'].astype(str).str.strip() == '판매중']
+        for _, mr in selling.iterrows():
+            master_name = str(mr['사업명']).strip()
+            for tn in trend_df['공연명'].unique():
+                tn_s = str(tn).strip()
+                if tn_s == master_name or tn_s in master_name or master_name in tn_s:
+                    _active_perf_names.append(tn)
+                    break
+
+    if not _active_perf_names and not active_df.empty:
+        _active_perf_names_set = set()
+        for aname in active_df['공연명'].tolist()[:6]:
+            for tn in trend_df['공연명'].unique():
+                tn_s = str(tn).strip()
+                aname_s = str(aname).strip()
+                if tn_s == aname_s or tn_s in aname_s or aname_s in tn_s:
+                    _active_perf_names_set.add(tn)
+                    break
+        _active_perf_names = list(_active_perf_names_set)
+
+    # ── X축 기간 범위 결정 ──
+    _x_min, _x_max = None, None
+    for ap_name in _active_perf_names:
+        matched_m = _match_master(ap_name, master_df)
+        # 시작: 티켓오픈일 → 해당 공연 trend 최초 기록일
+        if matched_m is not None and pd.notna(matched_m.get('티켓오픈일')):
+            open_dt = pd.to_datetime(matched_m['티켓오픈일'], errors='coerce')
+            if pd.notna(open_dt):
+                _x_min = min(_x_min, open_dt) if _x_min else open_dt
+        if _x_min is None or (matched_m is not None and pd.isna(matched_m.get('티켓오픈일'))):
+            ap_trend = trend_df[trend_df['공연명'] == ap_name]
+            if not ap_trend.empty:
+                first_dt = pd.to_datetime(ap_trend['기준일자'], errors='coerce').min()
+                if pd.notna(first_dt):
+                    _x_min = min(_x_min, first_dt) if _x_min else first_dt
+        # 끝: 공연마스터 종료일 또는 공연일(날짜)
+        if matched_m is not None:
+            end_dt = pd.to_datetime(matched_m.get('종료일'), errors='coerce')
+            if pd.notna(end_dt):
+                _x_max = max(_x_max, end_dt) if _x_max else end_dt
+
+    # fallback: active_df의 최대 공연일(날짜)
+    if _x_max is None and not active_df.empty and '공연일(날짜)' in active_df.columns:
+        _x_max = active_df['공연일(날짜)'].max()
+
+    # ── 컨트롤: 지표 + 일별/주별/월별 토글 ──
+    _ctrl1, _ctrl2 = st.columns(2)
+    with _ctrl1:
+        trend_metric = st.radio("지표 선택", ['합계좌석', '합계금액'], horizontal=True)
+    with _ctrl2:
+        trend_resample = st.radio("기간 단위", ['일별', '주별', '월별'], index=1, horizontal=True)
 
     perf_list = trend_df['공연명'].unique().tolist()
-    selected_perfs = st.multiselect("공연 선택", perf_list, default=perf_list)
+    _default_perfs = [p for p in _active_perf_names if p in perf_list] or perf_list
+    selected_perfs = st.multiselect("공연 선택", perf_list, default=_default_perfs)
 
     filtered_trend = trend_df[trend_df['공연명'].isin(selected_perfs)].copy()
-    filtered_trend = filtered_trend.sort_values(by='기준일자')
+    filtered_trend['기준일자'] = pd.to_datetime(filtered_trend['기준일자'], errors='coerce')
+    filtered_trend = filtered_trend.dropna(subset=['기준일자']).sort_values(by='기준일자')
 
-    if trend_metric in filtered_trend.columns:
+    # X축 범위 적용
+    if _x_min is not None:
+        filtered_trend = filtered_trend[filtered_trend['기준일자'] >= _x_min]
+    if _x_max is not None:
+        filtered_trend = filtered_trend[filtered_trend['기준일자'] <= _x_max]
+
+    # ── 리샘플링 (누적값이므로 각 구간의 마지막 값) ──
+    if trend_metric in filtered_trend.columns and not filtered_trend.empty:
+        if trend_resample == '주별':
+            filtered_trend = (
+                filtered_trend.groupby([pd.Grouper(key='기준일자', freq='W-MON'), '공연명'])
+                [trend_metric].last().reset_index()
+            )
+        elif trend_resample == '월별':
+            filtered_trend = (
+                filtered_trend.groupby([pd.Grouper(key='기준일자', freq='MS'), '공연명'])
+                [trend_metric].last().reset_index()
+            )
+        filtered_trend = filtered_trend.dropna(subset=[trend_metric]).sort_values('기준일자')
+
         fig2 = px.line(filtered_trend, x='기준일자', y=trend_metric, color='공연명', markers=True)
         fig2.update_layout(xaxis_title="기준일자", yaxis_title=trend_metric)
         fig2 = apply_common_layout(fig2)
