@@ -144,16 +144,21 @@ with st.sidebar.expander("디버그: Raw 데이터"):
     st.write(f"**grouped 공연일(날짜):**")
     st.dataframe(grouped[['공연명', '공연일(날짜)']].head(), use_container_width=True, hide_index=True)
 
-# ── 전일대비 계산 (판매추이 시트에서 최신 2일치 비교) ──
+# ── 전일대비 계산 (누적기록의 전일대비(석) 컬럼 또는 최신 2일치 비교) ──
 daily_diff = {}
-if trend_df is not None and not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in trend_df.columns and '합계좌석' in trend_df.columns:
+if trend_df is not None and not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in trend_df.columns:
     for perf_name, grp in trend_df.groupby('공연명'):
-        grp_sorted = grp.dropna(subset=['기준일자', '합계좌석']).sort_values('기준일자')
-        if len(grp_sorted) >= 2:
+        grp_sorted = grp.dropna(subset=['기준일자']).sort_values('기준일자')
+        if grp_sorted.empty:
+            continue
+        latest = grp_sorted.iloc[-1]
+        # 1차: 전일대비(석) 컬럼 직접 사용
+        if '전일대비(석)' in grp_sorted.columns and pd.notna(latest.get('전일대비(석)')) and latest['전일대비(석)'] != 0:
+            daily_diff[perf_name] = int(latest['전일대비(석)'])
+        # 2차: 없으면 최신 2일치 합계좌석 차이
+        elif '합계좌석' in grp_sorted.columns and len(grp_sorted) >= 2:
             last_two = grp_sorted.tail(2)
-            prev_seats = last_two.iloc[0]['합계좌석']
-            curr_seats = last_two.iloc[1]['합계좌석']
-            diff = int(curr_seats - prev_seats)
+            diff = int(last_two.iloc[1]['합계좌석'] - last_two.iloc[0]['합계좌석'])
             daily_diff[perf_name] = diff
 
 # ── 판매중 / 종료 분리 ──

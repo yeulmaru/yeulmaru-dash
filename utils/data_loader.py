@@ -200,19 +200,30 @@ def load_daily_input():
 
 @st.cache_data(ttl=60)
 def load_sales_trend():
+    """일일입력 시트의 누적기록(행16~)에서 판매추이 데이터를 읽는다.
+    (판매추이 시트는 수식 참조라 openpyxl로 값을 읽을 수 없음)"""
     source = get_excel_data()
     if not source:
         return None
     try:
-        df = pd.read_excel(source, sheet_name='판매추이')
-        # 기준일자 컬럼 자동 감지
-        for col in df.columns:
-            col_str = str(col)
-            if '기준' in col_str and '일자' in col_str:
-                df[col] = pd.to_datetime(df[col].astype(str), format='%Y%m%d', errors='coerce')
+        df = pd.read_excel(source, sheet_name='일일입력', skiprows=15)
+        # 불필요 컬럼 제거
+        df = df.loc[:, ~df.columns.str.startswith('Unnamed')]
+        # 기준일자·공연명이 비어있는 행 제거
+        df = df.dropna(subset=['기준일자', '공연명']).copy()
+        # 기준일자 → datetime
+        df['기준일자'] = pd.to_datetime(
+            df['기준일자'].astype(str).str.replace(r'\.0$', '', regex=True),
+            format='%Y%m%d', errors='coerce',
+        )
+        df = df.dropna(subset=['기준일자'])
+        # 숫자 컬럼 변환
+        for col in ['합계좌석', '합계금액', '점유율', '전일대비(석)', '전일대비(원)', '객단가']:
+            if col in df.columns:
+                df[col] = pd.to_numeric(df[col], errors='coerce').fillna(0)
         return df
     except Exception as e:
-        st.error(f"`판매추이` 데이터 로드 오류: {e}")
+        st.error(f"판매추이(일일입력 누적) 데이터 로드 오류: {e}")
         return None
 
 
