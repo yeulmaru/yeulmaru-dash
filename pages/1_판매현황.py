@@ -103,21 +103,18 @@ def fmt_dday(days):
 
 
 def fmt_occupancy(occ_pct):
-    """사전 계산된 점유율(%) 값을 포맷"""
     if pd.isna(occ_pct):
         return "-"
     return f"{occ_pct:.1f}%"
 
 
 def fmt_money_man(val):
-    """원 → 만원 (반올림)"""
     if pd.isna(val) or val == 0:
-        return "0"
-    return f"{int(round(val / 10000)):,}"
+        return "0만원"
+    return f"{int(round(val / 10000)):,}만원"
 
 
 def fmt_daily_diff(perf_name):
-    """전일대비 좌석 변동 포맷"""
     diff = daily_diff.get(perf_name)
     if diff is None:
         return "-"
@@ -128,33 +125,74 @@ def fmt_daily_diff(perf_name):
     return "0석"
 
 
-def build_display_df(df, is_active=True):
-    """표시용 DataFrame 생성"""
-    rows = []
+def _dday_color(days):
+    """D-day 값에 따른 색상 반환"""
+    if pd.isna(days):
+        return "#FFFFFF"
+    d = int(days)
+    if 0 <= d < 14:
+        return "#FF8C00"
+    elif 14 <= d < 28:
+        return "#FFD700"
+    return "#FFFFFF"
+
+
+ACCENT = "#0FFD02"
+
+
+def build_html_table(df, is_active=True):
+    """HTML 테이블 생성"""
+    if is_active:
+        headers = ['공연명', 'D-day', '판매좌석', '오픈석', '점유율(%)', '합계금액', '전일대비']
+    else:
+        headers = ['공연명', '공연일', '판매좌석', '오픈석', '최종 점유율(%)', '합계금액', '전일대비']
+
+    right_align_cols = {2, 3, 4, 5, 6}  # 판매좌석~전일대비
+
+    html = '<table style="width:100%;border-collapse:collapse;font-size:14px;">'
+    # 헤더
+    html += '<tr>'
+    for i, h in enumerate(headers):
+        align = 'right' if i in right_align_cols else 'left'
+        html += f'<th style="text-align:{align};padding:8px 12px;border-bottom:2px solid #444;color:#AAA;font-weight:600;">{h}</th>'
+    html += '</tr>'
+
+    # 행
     for _, r in df.iterrows():
+        days = r.get('_days')
+        dday_col = _dday_color(days)
         seats = int(r['합계좌석']) if pd.notna(r['합계좌석']) else 0
-        money = r['합계금액'] if pd.notna(r['합계금액']) else 0
-
-        row = {'공연명': r['공연명']}
-        if is_active:
-            row['D-day'] = fmt_dday(r.get('_days'))
-        else:
-            if '공연일(날짜)' in r.index and pd.notna(r['공연일(날짜)']):
-                row['공연일'] = pd.to_datetime(r['공연일(날짜)']).strftime('%Y-%m-%d')
-            else:
-                row['공연일'] = ''
-
         open_s = int(r['오픈석']) if pd.notna(r['오픈석']) else 0
-        row['판매좌석'] = f"{seats:,}"
-        row['오픈석'] = f"{open_s:,}"
+        money = r['합계금액'] if pd.notna(r['합계금액']) else 0
+        occ = fmt_occupancy(r.get('점유율'))
+        diff_str = fmt_daily_diff(r['공연명'])
+        money_str = fmt_money_man(money)
 
-        col_name = '점유율(%)' if is_active else '최종 점유율(%)'
-        row[col_name] = fmt_occupancy(r.get('점유율'))
-        row['합계금액(만원)'] = fmt_money_man(money)
-        row['전일대비'] = fmt_daily_diff(r['공연명'])
-        rows.append(row)
+        html += '<tr style="border-bottom:1px solid #333;">'
+        # 공연명
+        html += f'<td style="padding:8px 12px;color:{dday_col};">{r["공연명"]}</td>'
+        # D-day / 공연일
+        if is_active:
+            html += f'<td style="padding:8px 12px;color:{dday_col};">{fmt_dday(days)}</td>'
+        else:
+            dt_str = ''
+            if '공연일(날짜)' in r.index and pd.notna(r['공연일(날짜)']):
+                dt_str = pd.to_datetime(r['공연일(날짜)']).strftime('%Y-%m-%d')
+            html += f'<td style="padding:8px 12px;">{dt_str}</td>'
+        # 판매좌석 (강조)
+        html += f'<td style="padding:8px 12px;text-align:right;color:{ACCENT};font-weight:600;">{seats:,}석</td>'
+        # 오픈석 (기본)
+        html += f'<td style="padding:8px 12px;text-align:right;">{open_s:,}석</td>'
+        # 점유율 (강조)
+        html += f'<td style="padding:8px 12px;text-align:right;color:{ACCENT};font-weight:600;">{occ}</td>'
+        # 합계금액 (기본)
+        html += f'<td style="padding:8px 12px;text-align:right;">{money_str}</td>'
+        # 전일대비 (강조)
+        html += f'<td style="padding:8px 12px;text-align:right;color:{ACCENT};font-weight:600;">{diff_str}</td>'
+        html += '</tr>'
 
-    return pd.DataFrame(rows)
+    html += '</table>'
+    return html
 
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -182,17 +220,7 @@ st.subheader("판매중 공연")
 if active_df.empty:
     st.info("현재 판매중인 공연이 없습니다.")
 else:
-    disp = build_display_df(active_df, is_active=True)
-    right_cols = ['판매좌석', '오픈석', '점유율(%)', '합계금액(만원)', '전일대비']
-    col_config = {
-        c: st.column_config.TextColumn(c, width="small") for c in right_cols
-    }
-    st.dataframe(
-        disp,
-        use_container_width=True,
-        hide_index=True,
-        column_config=col_config,
-    )
+    st.markdown(build_html_table(active_df, is_active=True), unsafe_allow_html=True)
 
 st.markdown("---")
 
@@ -201,17 +229,7 @@ st.markdown("---")
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 if not ended_df.empty:
     with st.expander(f"종료된 공연 보기 ({len(ended_df)}건)"):
-        disp_ended = build_display_df(ended_df, is_active=False)
-        right_cols_ended = ['판매좌석', '오픈석', '최종 점유율(%)', '합계금액(만원)', '전일대비']
-        col_config_ended = {
-            c: st.column_config.TextColumn(c, width="small") for c in right_cols_ended
-        }
-        st.dataframe(
-            disp_ended,
-            use_container_width=True,
-            hide_index=True,
-            column_config=col_config_ended,
-        )
+        st.markdown(build_html_table(ended_df, is_active=False), unsafe_allow_html=True)
 
 st.markdown("---")
 
