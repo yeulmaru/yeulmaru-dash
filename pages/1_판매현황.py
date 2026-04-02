@@ -466,19 +466,19 @@ if not active_df.empty:
     # 범례 (HTML, 2그룹 좌우 분리)
     leg_l, leg_r = st.columns(2)
     leg_l.markdown(
-        '<div style="font-size:11px;color:#AAA;">'
-        '<span style="color:#FF4B4B">■</span> ~25% &nbsp;&nbsp;'
-        '<span style="color:#FF8C00">■</span> 25~50% &nbsp;&nbsp;'
-        '<span style="color:#FFD700">■</span> 50~75% &nbsp;&nbsp;'
-        '<span style="color:#FFFFFF">■</span> 75%↑'
+        '<div style="font-size:22px;color:#AAA;overflow:visible;margin-bottom:8px;">'
+        '<span style="color:#FF4B4B;font-size:28px;">■</span> ~25% &nbsp;&nbsp;'
+        '<span style="color:#FF8C00;font-size:28px;">■</span> 25~50% &nbsp;&nbsp;'
+        '<span style="color:#FFD700;font-size:28px;">■</span> 50~75% &nbsp;&nbsp;'
+        '<span style="color:#FFFFFF;font-size:28px;">■</span> 75%↑'
         '</div>',
         unsafe_allow_html=True,
     )
     leg_r.markdown(
-        '<div style="font-size:11px;color:#AAA;text-align:right;">'
-        '<span style="color:#FFD700">┊</span> 공연별 목표 &nbsp;&nbsp;'
-        '<span style="color:#FF4B4B">┊</span> 100% &nbsp;&nbsp;'
-        '<span style="color:#555">─</span> D-28'
+        '<div style="font-size:22px;color:#AAA;text-align:right;overflow:visible;margin-bottom:8px;">'
+        '<span style="color:#FFD700;font-size:28px;">┊</span> 공연별 목표 &nbsp;&nbsp;'
+        '<span style="color:#FF4B4B;font-size:28px;">┊</span> 100% &nbsp;&nbsp;'
+        '<span style="color:#555;font-size:28px;">─</span> D-28'
         '</div>',
         unsafe_allow_html=True,
     )
