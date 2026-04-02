@@ -652,7 +652,7 @@ st.markdown('<hr style="margin:8px 0;border-color:rgba(255,255,255,0.1);">', uns
 # 판매추이 (판매중 공연만)
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in trend_df.columns:
-    st.markdown('<div style="font-size:20px;font-weight:600;margin-bottom:4px;">📈 판매추이</div>', unsafe_allow_html=True)
+    st.markdown('<div style="font-size:20px;font-weight:600;margin:0 0 2px 0;">📈 판매추이</div>', unsafe_allow_html=True)
 
     # ── 판매중 공연 목록 결정 ──
     # 1차: 공연마스터에 '상태' 컬럼이 있으면 '판매중'인 공연
@@ -706,27 +706,37 @@ if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in 
 
     # ── 영역2: 공통 컨트롤 ──
     _ctrl1, _ctrl2 = st.columns(2)
+    _LBL = 'font-size:15px;font-weight:bold;color:#0FFD02;margin:0 0 2px 0;'
     with _ctrl1:
-        trend_metric = st.radio("지표 선택", ['점유율(%)', '합계좌석', '합계금액'], horizontal=True)
+        st.markdown(f'<div style="{_LBL}">지표 선택</div>', unsafe_allow_html=True)
+        trend_metric = st.radio("지표 선택", ['점유율(%)', '합계좌석', '합계금액'], horizontal=True, label_visibility="collapsed")
     with _ctrl2:
-        trend_resample = st.radio("기간 단위", ['일별', '주별', '월별'], index=1, horizontal=True)
+        st.markdown(f'<div style="{_LBL}">기간 단위</div>', unsafe_allow_html=True)
+        trend_resample = st.radio("기간 단위", ['일별', '주별', '월별'], index=1, horizontal=True, label_visibility="collapsed")
 
     perf_list = trend_df['공연명'].unique().tolist()
     _default_perfs = [p for p in _active_perf_names if p in perf_list] or perf_list
 
-    # ── 공연 카테고리: 공연마스터 사업구분 → 코드 fallback ──
+    # ── 공연 카테고리: 공연마스터 사업구분 → 키워드 fallback ──
     _CATEGORY_FALLBACK = {
         '브런치콘서트': '상업성',
         '100층짜리': '상업성',
+        '실내악': '공공성',
+        '무지쿰': '공공성',
+        '편한 음악': '공공성',
+        '페스티발앙상블': '공공성',
+        '국립심포니': '공공성',
     }
 
     def _get_category(perf_name):
-        matched_m = _match_master(perf_name, master_df)
-        if matched_m is not None and pd.notna(matched_m.get('사업구분')):
-            return str(matched_m['사업구분']).strip()
+        # 1차: 키워드 fallback (확실한 매핑 우선)
         for key, cat in _CATEGORY_FALLBACK.items():
             if key in str(perf_name):
                 return cat
+        # 2차: 공연마스터 사업구분 컬럼
+        matched_m = _match_master(perf_name, master_df)
+        if matched_m is not None and pd.notna(matched_m.get('사업구분')):
+            return str(matched_m['사업구분']).strip()
         return '공공성'
 
     # ── 체크박스 초기화 ──
@@ -747,11 +757,13 @@ if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in 
     </style>
     """, unsafe_allow_html=True)
 
+    _LABEL_STYLE = 'font-size:15px;font-weight:bold;color:#0FFD02;margin:0 0 2px 0;'
+
     _tbl_left, _tbl_right = st.columns(2)
 
     def _render_checklist(container, title, perf_names):
         with container:
-            st.markdown(f'<div style="font-size:13px;font-weight:600;color:#AAA;margin:0 0 2px 0;">{title}</div>', unsafe_allow_html=True)
+            st.markdown(f'<div style="{_LABEL_STYLE}">{title}</div>', unsafe_allow_html=True)
             _cont = st.container()
             with _cont:
                 for i, pname in enumerate(perf_names):
@@ -853,7 +865,7 @@ if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in 
         cat_data = filtered_trend[filtered_trend['공연명'].isin(cat_selected)]
         with container:
             st.markdown(
-                f'<div style="font-size:14px;font-weight:600;color:#AAA;margin-bottom:4px;">{title}</div>',
+                f'<div style="{_LABEL_STYLE}">{title}</div>',
                 unsafe_allow_html=True,
             )
             if cat_data.empty or _y_col not in cat_data.columns:
