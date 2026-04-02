@@ -476,9 +476,12 @@ if not active_df.empty:
         x=chart_df['점유율'],
         y=y_labels,
         orientation='h',
+        width=0.3,
         marker=dict(color=colors, opacity=opacities),
         text=bar_texts,
-        textposition='auto',
+        textposition='outside',
+        textfont=dict(color='#FFFFFF', size=12),
+        cliponaxis=False,
         customdata=list(zip(
             chart_df['_days'].fillna(0).astype(int),
             chart_df['목표점유율'],
@@ -501,16 +504,27 @@ if not active_df.empty:
     fig.add_vline(x=100, line_dash="dash", line_color=COLORS['danger'],
                   annotation_text="100%", annotation_position="top right")
 
-    # 각 공연별 목표점유율 개별 세로선
+    # 각 공연별 목표점유율 개별 세로선 + annotation
+    seen_targets = set()
     for i, (_, row) in enumerate(chart_df.iterrows()):
         target = row['목표점유율']
         fig.add_shape(
             type="line",
             x0=target, x1=target,
-            y0=i - 0.4, y1=i + 0.4,
+            y0=i - 0.25, y1=i + 0.25,
             yref="y",
-            line=dict(color="#FFD700", width=2, dash="dash"),
+            line=dict(color="#FFD700", width=2, dash="dot"),
         )
+        # 같은 목표값의 annotation은 첫 번째만 표시
+        if target not in seen_targets:
+            seen_targets.add(target)
+            fig.add_annotation(
+                x=target, y=i, yref="y",
+                text=f"목표 {target:.0f}%",
+                showarrow=False,
+                font=dict(color="#FFFFFF", size=9),
+                yshift=18,
+            )
 
     # D-28 구분선 (우측 끝에 흰색 볼드 텍스트)
     if separator_y is not None:
