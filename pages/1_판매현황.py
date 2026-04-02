@@ -755,22 +755,7 @@ if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in 
 
     _LABEL_STYLE = 'font-size:15px;font-weight:bold;color:#0FFD02;margin:0 0 2px 0;'
 
-    # ── 체크리스트 CSS (행간 축소 + 홀짝 배경 + 강조색) ──
-    st.markdown("""
-    <style>
-    .checklist-row [data-testid="stCheckbox"] {padding:0 !important;}
-    .checklist-row [data-testid="stCheckbox"] label {
-        font-size:13px !important; gap:6px !important;
-        padding:5px 6px !important; margin:0 !important;
-        border-radius:4px;
-    }
-    .checklist-row [data-testid="stCheckbox"] input[type="checkbox"]:checked {
-        accent-color:#0FFD02 !important;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-
-    # ── 공연 선택 체크리스트 ──
+    # ── 공연 선택 체크리스트 (st.container per row — 홀짝 배경 보장) ──
     def _render_checklist(container, title, perf_names, editor_key):
         with container:
             st.markdown(f'<div style="{_LABEL_STYLE}">{title}</div>', unsafe_allow_html=True)
@@ -778,14 +763,55 @@ if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in 
                 st.caption("해당 공연 없음")
                 return []
 
+            # ── 행별 배경색 + 공통 스타일 CSS (st-key 기반) ──
+            pfx = f'{editor_key}_r'
+            css = ''
+            for i in range(len(perf_names)):
+                bg = 'rgba(255,255,255,0.07)' if i % 2 == 0 else 'rgba(255,255,255,0.02)'
+                css += f'div[st-key="{pfx}{i}"]{{background:{bg}!important;border-radius:4px;margin-bottom:1px;}}\n'
+            css += (
+                f'div[st-key^="{pfx}"] [data-testid="stCheckbox"] label'
+                f'{{padding:2px 0!important;min-height:0!important;}}\n'
+                f'div[st-key^="{pfx}"] [data-testid="stCheckbox"] input:checked'
+                f'{{accent-color:#0FFD02!important;}}\n'
+                f'div[st-key^="{pfx}"] [data-testid="stVerticalBlock"]'
+                f'{{gap:0!important;}}\n'
+                f'div[st-key^="{pfx}"] .stColumn [data-testid="stVerticalBlock"]'
+                f'{{gap:0!important;}}\n'
+            )
+            st.markdown(f'<style>{css}</style>', unsafe_allow_html=True)
+
+            # ── 헤더 행 ──
+            st.markdown(
+                '<div style="display:grid;grid-template-columns:28px 100px 1fr;'
+                'font-size:13px;font-weight:bold;padding:5px 8px;'
+                'border-bottom:1px solid rgba(255,255,255,0.15);">'
+                '<span></span><span>공연일</span><span>공연명</span></div>',
+                unsafe_allow_html=True,
+            )
+
+            # ── 데이터 행 ──
             selected = []
             for i, pname in enumerate(perf_names):
                 date_str = perf_date_map.get(pname, '')
-                label = f'{date_str}　{pname}' if date_str else pname
-                bg = 'rgba(255,255,255,0.07)' if i % 2 == 0 else 'transparent'
-                st.markdown(f'<div class="checklist-row" style="background:{bg};border-radius:4px;">', unsafe_allow_html=True)
-                checked = st.checkbox(label, value=True, key=f'{editor_key}_{i}')
-                st.markdown('</div>', unsafe_allow_html=True)
+                with st.container(key=f'{pfx}{i}'):
+                    c1, c2, c3 = st.columns([0.3, 1.2, 3.5])
+                    with c1:
+                        checked = st.checkbox(
+                            'sel', value=True,
+                            key=f'{editor_key}_{i}',
+                            label_visibility='collapsed',
+                        )
+                    with c2:
+                        st.markdown(
+                            f'<span style="font-size:13px;line-height:2.4;">{date_str}</span>',
+                            unsafe_allow_html=True,
+                        )
+                    with c3:
+                        st.markdown(
+                            f'<span style="font-size:13px;line-height:2.4;">{pname}</span>',
+                            unsafe_allow_html=True,
+                        )
                 if checked:
                     selected.append(pname)
             return selected
