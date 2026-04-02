@@ -755,7 +755,7 @@ if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in 
 
     _LABEL_STYLE = 'font-size:15px;font-weight:bold;color:#0FFD02;margin:0 0 2px 0;'
 
-    # ── data_editor 컴팩트 + 홀짝 행 CSS ──
+    # ── data_editor 컴팩트 + 홀짝 행 + 체크박스 강조 + 헤더 볼드 CSS ──
     st.markdown("""
     <style>
     [data-testid="stDataFrame"] [data-testid="glideDataEditor"] {
@@ -766,6 +766,21 @@ if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in 
     }
     [data-testid="stDataFrame"] tbody tr:nth-child(odd) {
         background-color: rgba(255,255,255,0.01) !important;
+    }
+    /* 체크박스 강조색 */
+    [data-testid="stDataFrame"] input[type="checkbox"]:checked {
+        accent-color: #0FFD02 !important;
+    }
+    /* 헤더 볼드 */
+    [data-testid="stDataFrame"] thead th {
+        font-weight: bold !important;
+    }
+    /* 테이블 전폭 – 우측 빈 공간 제거 */
+    [data-testid="stDataFrame"] {
+        width: 100% !important;
+    }
+    [data-testid="stDataFrame"] table {
+        width: 100% !important;
     }
     </style>
     """, unsafe_allow_html=True)
@@ -788,9 +803,9 @@ if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in 
             edited = st.data_editor(
                 df,
                 column_config={
-                    '선택': st.column_config.CheckboxColumn('', width=30, default=True),
+                    '선택': st.column_config.CheckboxColumn('', width=50, default=True),
                     '공연일': st.column_config.TextColumn('공연일', width=120),
-                    '공연명': st.column_config.TextColumn('공연명', width=None),
+                    '공연명': st.column_config.TextColumn('공연명'),
                 },
                 disabled=['공연일', '공연명'],
                 hide_index=True,
