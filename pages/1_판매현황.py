@@ -600,31 +600,47 @@ if not active_df.empty:
         else:
             y_tick_texts.append(f'<span style="color:{color}">{name}</span>')
 
+    # 범례 (차트 우측 상단 annotation)
+    legend_text = (
+        '<span style="color:#AAA">■ 달성률</span>  '
+        '<span style="color:#FFFFFF">● 75%↑</span>  '
+        '<span style="color:#FFD700">● 50~75%</span>  '
+        '<span style="color:#FF8C00">● 25~50%</span>  '
+        '<span style="color:#FF4B4B">● ~25%</span><br>'
+        '<span style="color:#FFD700">┆</span> <span style="color:#AAA">공연별 목표</span>  '
+        '<span style="color:#FF4B4B">┆</span> <span style="color:#AAA">100%</span>  '
+        '<span style="color:#555">─</span> <span style="color:#AAA">D-28</span>'
+    )
+    fig.add_annotation(
+        x=1.0, y=1.0, xref="paper", yref="paper",
+        xanchor="right", yanchor="top",
+        text=legend_text, showarrow=False,
+        font=dict(size=10, color="#AAA"),
+        bgcolor="rgba(0,0,0,0.7)", bordercolor="#333", borderwidth=1, borderpad=6,
+    )
+
     fig.update_layout(
-        xaxis_title="점유율 (%)", yaxis_title="",
+        xaxis_title=dict(text="점유율 (%)", standoff=5),
+        yaxis_title="",
         xaxis=dict(
             tickvals=all_ticks, ticktext=tick_texts,
             showgrid=True, gridcolor="rgba(255,255,255,0.08)", gridwidth=1,
+            title_standoff=5,
+            side="bottom",
         ),
         yaxis=dict(ticktext=y_tick_texts, tickvals=y_labels, showgrid=False),
     )
+    # X축 라벨을 좌측 하단에 배치
+    fig.add_annotation(
+        x=0, y=-0.08, xref="paper", yref="paper",
+        xanchor="left", yanchor="top",
+        text="점유율 (%)", showarrow=False,
+        font=dict(size=12, color="#AAA"),
+    )
+    fig.update_layout(xaxis_title="")  # 기본 중앙 타이틀 제거
+
     fig = apply_common_layout(fig)
     st.plotly_chart(fig, use_container_width=True)
-
-    # 범례 (HTML)
-    st.markdown("""
-    <div style="display:flex;flex-wrap:wrap;gap:12px 20px;font-size:11px;color:#AAA;padding:0 4px;">
-      <span>■ 달성률 &nbsp;
-        <span style="color:#FFFFFF">● 75%↑</span> &nbsp;
-        <span style="color:#FFD700">● 50~75%</span> &nbsp;
-        <span style="color:#FF8C00">● 25~50%</span> &nbsp;
-        <span style="color:#FF4B4B">● ~25%</span>
-      </span>
-      <span style="color:#FFD700">┆</span> <span>공연별 목표</span>
-      <span style="color:#FF4B4B">┆</span> <span>100%</span>
-      <span style="color:#555">─</span> <span>D-28 구분</span>
-    </div>
-    """, unsafe_allow_html=True)
 
 st.markdown("---")
 
