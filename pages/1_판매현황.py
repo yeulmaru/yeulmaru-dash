@@ -739,85 +739,58 @@ if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in 
             return str(matched_m['사업구분']).strip()
         return '공공성'
 
-    # ── 체크박스 초기화 ──
-    for p in _default_perfs:
-        _cbk = f"_trend_cb_{p}"
-        if _cbk not in st.session_state:
-            st.session_state[_cbk] = True
-
     _commercial = [p for p in _default_perfs if _get_category(p) == '상업성']
     _public = [p for p in _default_perfs if _get_category(p) == '공공성']
 
     _LABEL_STYLE = 'font-size:15px;font-weight:bold;color:#0FFD02;margin:0 0 2px 0;'
 
-    def _build_checklist_css(title, perf_names):
-        """컨테이너 key 기반으로 행별 배경 + 컴팩트 CSS 생성"""
-        key = f"trend_cl_{title}"
-        sel = f'div[data-testid="stVerticalBlock"][data-st-key="{key}"]'
-        css = f"""
-        {sel} {{ gap: 0 !important; }}
-        {sel} > [data-testid="stVerticalBlockBorderWrapper"] {{
-            padding: 0 !important; margin: 0 !important;
-        }}
-        {sel} [data-testid="stHorizontalBlock"] {{
-            gap: 0 !important; align-items: center !important;
-            padding: 2px 8px !important; min-height: 0 !important;
-            border-bottom: 1px solid rgba(255,255,255,0.06);
-        }}
-        {sel} [data-testid="column"] {{
-            display: flex !important; align-items: center !important; padding: 0 !important;
-        }}
-        {sel} .stCheckbox {{
-            margin: 0 !important; padding: 0 !important;
-        }}
-        {sel} .stCheckbox > label {{
-            padding: 0 !important; min-height: 0 !important;
-            margin: 0 !important; display: flex !important; align-items: center !important;
-        }}
-        {sel} .stCheckbox > label > span {{ margin: 0 !important; }}
-        {sel} .stMarkdown {{ margin: 0 !important; padding: 0 !important; }}
-        {sel} .stMarkdown p {{ margin: 0 !important; padding: 0 !important; }}
-        """
-        # 행별 배경: 홀짝 + 체크 강조
-        for i, pname in enumerate(perf_names):
-            # nth-child는 1-based, st.markdown(CSS)가 첫 자식이므로 실제 행은 i+2부터
-            nth = i + 2
-            checked = st.session_state.get(f"_trend_cb_{pname}", True)
-            if checked:
-                bg = "rgba(15,253,2,0.08)"
-            elif i % 2 == 1:
-                bg = "rgba(255,255,255,0.08)"
-            else:
-                bg = "rgba(255,255,255,0.02)"
-            css += f"""
-            {sel} > [data-testid="stVerticalBlockBorderWrapper"]:nth-child({nth})
-            [data-testid="stHorizontalBlock"] {{ background: {bg} !important; }}
-            """
-        return css
+    # ── data_editor 컴팩트 CSS ──
+    st.markdown("""
+    <style>
+    [data-testid="stDataFrame"] [data-testid="glideDataEditor"] {
+        font-size: 13px !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
-    _tbl_left, _tbl_right = st.columns(2)
+    # ── 공연 선택 표 (st.data_editor 기반) ──
+    def _build_editor_df(perf_names):
+        rows = []
+        for pname in perf_names:
+            date_str = perf_date_map.get(pname, '')
+            rows.append({'선택': True, '공연일': date_str, '공연명': pname})
+        return pd.DataFrame(rows)
 
-    def _render_checklist(container, title, perf_names):
+    def _render_checklist(container, title, perf_names, editor_key):
         with container:
             st.markdown(f'<div style="{_LABEL_STYLE}">{title}</div>', unsafe_allow_html=True)
-            # CSS를 먼저 주입
-            st.markdown(f'<style>{_build_checklist_css(title, perf_names)}</style>', unsafe_allow_html=True)
-            _cont = st.container(key=f"trend_cl_{title}")
-            with _cont:
-                for pname in perf_names:
-                    date_str = perf_date_map.get(pname, '')
-                    col_cb, col_date, col_name = st.columns([0.05, 0.28, 0.67])
-                    with col_cb:
-                        st.checkbox(" ", key=f"_trend_cb_{pname}", label_visibility="collapsed")
-                    with col_date:
-                        st.markdown(f'<div style="color:#FFF;font-size:13px;">{date_str}</div>', unsafe_allow_html=True)
-                    with col_name:
-                        st.markdown(f'<div style="color:#FFF;font-size:13px;">{pname}</div>', unsafe_allow_html=True)
+            if not perf_names:
+                st.caption("해당 공연 없음")
+                return pd.DataFrame(columns=['선택', '공연일', '공연명'])
+            df = _build_editor_df(perf_names)
+            edited = st.data_editor(
+                df,
+                column_config={
+                    '선택': st.column_config.CheckboxColumn('', width=30, default=True),
+                    '공연일': st.column_config.TextColumn('공연일', width=120),
+                    '공연명': st.column_config.TextColumn('공연명', width=None),
+                },
+                disabled=['공연일', '공연명'],
+                hide_index=True,
+                use_container_width=True,
+                key=editor_key,
+                height=35 + len(perf_names) * 35,
+            )
+            return edited
 
-    _render_checklist(_tbl_left, "상업성", _commercial)
-    _render_checklist(_tbl_right, "공공성", _public)
+    _tbl_left, _tbl_right = st.columns(2)
+    _ed_commercial = _render_checklist(_tbl_left, "상업성", _commercial, "_trend_ed_commercial")
+    _ed_public = _render_checklist(_tbl_right, "공공성", _public, "_trend_ed_public")
 
-    selected_perfs = [p for p in _default_perfs if st.session_state.get(f"_trend_cb_{p}", True)]
+    # 선택된 공연 추출
+    _sel_commercial = _ed_commercial[_ed_commercial['선택'] == True]['공연명'].tolist() if not _ed_commercial.empty else []
+    _sel_public = _ed_public[_ed_public['선택'] == True]['공연명'].tolist() if not _ed_public.empty else []
+    selected_perfs = _sel_commercial + _sel_public
 
     # ── 공통 데이터 준비 ──
     filtered_trend = trend_df[trend_df['공연명'].isin(selected_perfs)].copy()
