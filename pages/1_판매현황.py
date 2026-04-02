@@ -700,7 +700,7 @@ st.markdown('<hr style="margin:8px 0;border-color:rgba(255,255,255,0.1);">', uns
 # 판매추이 (판매중 공연만)
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in trend_df.columns:
-    st.markdown('<div style="font-size:20px;font-weight:600;margin:0 0 8px 0;">📈 판매추이</div>', unsafe_allow_html=True)
+    st.markdown('<div style="font-size:2rem;font-weight:700;margin:0 0 24px 0;">📈 판매추이</div>', unsafe_allow_html=True)
 
     # ── 판매중 공연 목록 결정 ──
     # 1차: 공연마스터에 '상태' 컬럼이 있으면 '판매중'인 공연
@@ -754,7 +754,7 @@ if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in 
 
     # ── 영역2: 공통 컨트롤 ──
     _ctrl1, _ctrl2, _ctrl_spacer = st.columns([2.5, 1.5, 4])
-    _LBL = 'font-size:15px;font-weight:bold;color:#0FFD02;margin:0 0 4px 0;'
+    _LBL = 'font-size:24px;font-weight:bold;color:#0FFD02;margin:0 0 8px 0;'
     with _ctrl1:
         st.markdown(f'<div style="{_LBL}">[1] 지표 선택</div>', unsafe_allow_html=True)
         trend_metric = st.radio("지표 선택", ['점유율(%)', '합계좌석', '합계금액'], horizontal=True, label_visibility="collapsed")
@@ -790,7 +790,7 @@ if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in 
     _commercial = [p for p in _default_perfs if _get_category(p) == '상업성']
     _public = [p for p in _default_perfs if _get_category(p) == '공공성']
 
-    _LABEL_STYLE = 'font-size:15px;font-weight:bold;color:#0FFD02;margin:0 0 6px 0;'
+    _LABEL_STYLE = 'font-size:24px;font-weight:bold;color:#0FFD02;margin:0 0 12px 0;'
 
     # ── 공연 선택 표 (st.data_editor 기반) ──
     def _build_editor_df(perf_names):
