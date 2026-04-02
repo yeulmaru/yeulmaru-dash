@@ -663,7 +663,7 @@ st.markdown('<hr style="margin:8px 0;border-color:rgba(255,255,255,0.1);">', uns
 # 판매추이 (판매중 공연만)
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in trend_df.columns:
-    st.markdown('<div style="font-size:20px;font-weight:600;margin:0 0 2px 0;">📈 판매추이</div>', unsafe_allow_html=True)
+    st.markdown('<div style="font-size:20px;font-weight:600;margin:0 0 20px 0;">📈 판매추이</div>', unsafe_allow_html=True)
 
     # ── 판매중 공연 목록 결정 ──
     # 1차: 공연마스터에 '상태' 컬럼이 있으면 '판매중'인 공연
@@ -716,7 +716,7 @@ if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in 
         _x_max = active_df['공연일(날짜)'].max()
 
     # ── 영역2: 공통 컨트롤 ──
-    _ctrl1, _ctrl2 = st.columns(2)
+    _ctrl1, _ctrl2, _ctrl_spacer = st.columns([1.5, 1.5, 5])
     _LBL = 'font-size:15px;font-weight:bold;color:#0FFD02;margin:0 0 2px 0;'
     with _ctrl1:
         st.markdown(f'<div style="{_LBL}">지표 선택</div>', unsafe_allow_html=True)
