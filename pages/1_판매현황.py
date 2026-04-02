@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
+from datetime import datetime
 import sys
 import os
 
@@ -27,19 +28,26 @@ if daily_df is None or trend_df is None:
     st.error("데이터를 정상적으로 불러오지 못했습니다. `data` 폴더에 올바른 엑셀 파일이 위치해 있는지 확인해주세요.")
     st.stop()
 
-# ── 기준일자 파싱 ──
+# ── 날짜 파싱 ──
+weekdays_kr = ['월', '화', '수', '목', '금', '토', '일']
+
+# 오늘 (시스템)
+now_dt = datetime.now()
+today_str = now_dt.strftime('%Y년 %m월 %d일') + f' ({weekdays_kr[now_dt.weekday()]})'
+
+# 갱신일자 (엑셀 B2)
 if hasattr(base_date, 'weekday'):
     base_dt = base_date
 else:
     base_dt = pd.to_datetime(base_date, errors='coerce')
 
 if pd.notna(base_dt):
-    weekdays = ['월', '화', '수', '목', '금', '토', '일']
-    wd = weekdays[base_dt.weekday()]
-    base_date_str = base_dt.strftime(f'%Y년 %m월 %d일') + f' ({wd})'
+    base_date_str = base_dt.strftime('%Y년 %m월 %d일') + f' ({weekdays_kr[base_dt.weekday()]})'
 else:
     base_date_str = str(base_date)
     base_dt = None
+
+dates_differ = base_dt is not None and base_dt.date() != now_dt.date()
 
 # ── 공연별 최신 스냅샷 (날짜별 누적값이므로 최신 행만 사용) ──
 if '공연명' not in daily_df.columns:
@@ -52,6 +60,18 @@ daily_df['_sort_key'] = pd.to_numeric(daily_df['No'], errors='coerce')
 # 당일 데이터(No < 100)에서 같은 공연명의 행 수 = 회차수
 today_rows = daily_df[daily_df['_sort_key'] < 100]
 round_count_map = today_rows.groupby('공연명').size().to_dict()
+
+# 공연일 기간 맵: 같은 공연의 min~max 날짜
+perf_date_map = {}
+if '공연일(날짜)' in today_rows.columns:
+    for name, grp in today_rows.groupby('공연명'):
+        dates = pd.to_datetime(grp['공연일(날짜)'], errors='coerce').dropna().sort_values()
+        if dates.empty:
+            perf_date_map[name] = ''
+        elif dates.iloc[0] == dates.iloc[-1]:
+            perf_date_map[name] = f"{dates.iloc[0].month}.{dates.iloc[0].day}"
+        else:
+            perf_date_map[name] = f"{dates.iloc[0].month}.{dates.iloc[0].day}~{dates.iloc[-1].month}.{dates.iloc[-1].day}"
 
 BASE_SEAT_DEFAULT = 926  # 대극장 기본좌석
 
@@ -179,11 +199,11 @@ def _dday_zone(days):
 def build_html_table(df, is_active=True):
     """HTML 테이블 생성"""
     if is_active:
-        headers = ['공연명', 'D-day', '판매좌석', '오픈석(누적)', '점유율(%)', '합계금액', '전일대비']
+        headers = ['공연일', '공연명', 'D-day', '판매좌석', '오픈석(누적)', '점유율(%)', '합계금액', '전일대비']
+        right_align_cols = {3, 4, 5, 6, 7}
     else:
-        headers = ['공연명', '공연일', '판매좌석', '오픈석(누적)', '최종 점유율(%)', '합계금액', '전일대비']
-
-    right_align_cols = {2, 3, 4, 5, 6}  # 판매좌석~전일대비
+        headers = ['공연일', '공연명', 'D-day', '판매좌석', '오픈석(누적)', '최종 점유율(%)', '합계금액', '전일대비']
+        right_align_cols = {3, 4, 5, 6, 7}
 
     html = '<table style="width:100%;border-collapse:collapse;font-size:14px;">'
     # 헤더
@@ -199,12 +219,17 @@ def build_html_table(df, is_active=True):
         days = r.get('_days')
         dday_col = _dday_color(days)
         seats = int(r['합계좌석']) if pd.notna(r['합계좌석']) else 0
-        cumul_s = int(r['누적오픈석']) if pd.notna(r.get('누적오픈석')) else 0
-        open_str = f"{cumul_s:,}석"
+        rounds = int(r['_회차수']) if pd.notna(r.get('_회차수')) else 1
+        # 오픈석(누적) 표시: 1회차 "926석", 2이상 "926×6"
+        if rounds > 1:
+            open_str = f"{BASE_SEAT_DEFAULT:,}×{rounds}"
+        else:
+            open_str = f"{BASE_SEAT_DEFAULT:,}석"
         money = r['합계금액'] if pd.notna(r['합계금액']) else 0
         occ = fmt_occupancy(r.get('점유율'))
         diff_str = fmt_daily_diff(r['공연명'])
         money_str = fmt_money_man(money)
+        date_str = perf_date_map.get(r['공연명'], '')
 
         # 구간 경계 구분선 (D-14, D-28 경계)
         cur_zone = _dday_zone(days) if is_active else -1
@@ -215,9 +240,11 @@ def build_html_table(df, is_active=True):
         prev_zone = cur_zone
 
         html += f'<tr style="border-bottom:1px solid #333;{border_top}">'
+        # 공연일
+        html += f'<td style="padding:8px 12px;color:#AAA;">{date_str}</td>'
         # 공연명
         html += f'<td style="padding:8px 12px;color:{dday_col};">{r["공연명"]}</td>'
-        # D-day / 공연일
+        # D-day / 공연일(종료)
         if is_active:
             html += f'<td style="padding:8px 12px;color:{dday_col};">{fmt_dday(days)}</td>'
         else:
@@ -253,8 +280,19 @@ else:
 
 col1, col2, col3 = st.columns(3)
 col1.metric("판매중 공연", f"{n_active}개")
-col2.metric("평균 점유율", f"{avg_occ:.1f}%")
-col3.metric("오늘 기준일자", base_date_str)
+col2.markdown(
+    f'<div style="font-size:14px;color:#AAA;">평균 점유율</div>'
+    f'<div style="font-size:32px;font-weight:700;color:{ACCENT};">{avg_occ:.1f}%</div>',
+    unsafe_allow_html=True,
+)
+renew_color = '#FF8C00' if dates_differ else '#FFFFFF'
+col3.markdown(
+    f'<div style="font-size:14px;color:#AAA;">오늘</div>'
+    f'<div style="font-size:20px;font-weight:600;">{today_str}</div>'
+    f'<div style="font-size:14px;color:#AAA;margin-top:4px;">갱신일자</div>'
+    f'<div style="font-size:20px;font-weight:600;color:{renew_color};">{base_date_str}</div>',
+    unsafe_allow_html=True,
+)
 
 st.markdown("---")
 
