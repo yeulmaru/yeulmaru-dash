@@ -24,180 +24,201 @@ if daily_df is None or trend_df is None:
     st.error("데이터를 정상적으로 불러오지 못했습니다. `data` 폴더에 올바른 엑셀 파일이 위치해 있는지 확인해주세요.")
     st.stop()
 
+# ── 기준일자 파싱 ──
 if hasattr(base_date, 'weekday'):
-    weekdays = ['월요일', '화요일', '수요일', '목요일', '금요일', '토요일', '일요일']
-    wd = weekdays[base_date.weekday()]
-    base_date_str = base_date.strftime(f'%Y년 %m월 %d일 {wd}')
+    base_dt = base_date
 else:
-    try:
-        dt = pd.to_datetime(base_date)
-        weekdays = ['월요일', '화요일', '수요일', '목요일', '금요일', '토요일', '일요일']
-        wd = weekdays[dt.weekday()]
-        base_date_str = dt.strftime(f'%Y년 %m월 %d일 {wd}')
-    except Exception:
-        base_date_str = str(base_date)
+    base_dt = pd.to_datetime(base_date, errors='coerce')
 
-st.markdown(f"**기준일자**: {base_date_str}")
-st.markdown("---")
+if pd.notna(base_dt):
+    weekdays = ['월', '화', '수', '목', '금', '토', '일']
+    wd = weekdays[base_dt.weekday()]
+    base_date_str = base_dt.strftime(f'%Y년 %m월 %d일') + f' ({wd})'
+else:
+    base_date_str = str(base_date)
+    base_dt = None
 
-total_seats = daily_df['합계좌석'].sum() if '합계좌석' in daily_df.columns else 0
-total_rev = daily_df['합계금액'].sum() if '합계금액' in daily_df.columns else 0
+# ── 공연별 집계 ──
+if '공연명' not in daily_df.columns:
+    st.warning("데이터에 '공연명' 컬럼이 없습니다.")
+    st.stop()
 
-col1, col2 = st.columns(2)
-with col1:
-    st.metric("전체 판매좌석 합계", f"{int(total_seats):,}" if not pd.isna(total_seats) else "0")
-with col2:
-    st.metric("전체 판매금액 합계", f"{int(total_rev):,}원" if not pd.isna(total_rev) else "0원")
+agg_dict = {'합계좌석': 'sum', '합계금액': 'sum', '오픈석': 'sum'}
+if '공연일(날짜)' in daily_df.columns:
+    agg_dict['공연일(날짜)'] = 'min'
 
-st.markdown("### 공연별 요약")
+grouped = daily_df.groupby('공연명').agg(agg_dict).reset_index()
+grouped['점유율'] = (
+    grouped['합계좌석'] / grouped['오픈석'].replace(0, float('nan')) * 100
+).fillna(0).clip(upper=100.0)
 
-if '공연명' in daily_df.columns:
-    agg_dict = {
-        '합계좌석': 'sum',
-        '합계금액': 'sum',
-        '오픈석': 'sum'
-    }
-    if '공연일(날짜)' in daily_df.columns:
-        agg_dict['공연일(날짜)'] = 'min'
-        
-    daily_grouped = daily_df.groupby('공연명').agg(agg_dict).reset_index()
-    daily_grouped['점유율'] = (daily_grouped['합계좌석'] / daily_grouped['오픈석'].replace(0, float('nan')) * 100).fillna(0).clip(upper=100.0)
+# ── 판매중 / 종료 분리 ──
+today = pd.Timestamp.now().normalize()
 
-    if '공연일(날짜)' in daily_grouped.columns:
-        base_dt = pd.to_datetime(base_date, errors='coerce')
-        if pd.notna(base_dt):
-            daily_grouped['days_diff'] = (daily_grouped['공연일(날짜)'] - base_dt).dt.days
+if '공연일(날짜)' in grouped.columns:
+    grouped['공연일(날짜)'] = pd.to_datetime(grouped['공연일(날짜)'], errors='coerce')
+    grouped['_days'] = (grouped['공연일(날짜)'] - today).dt.days
+
+    active_df = grouped[grouped['_days'] >= 0].sort_values('공연일(날짜)', ascending=True).copy()
+    ended_df = grouped[grouped['_days'] < 0].sort_values('공연일(날짜)', ascending=False).copy()
+else:
+    active_df = grouped.copy()
+    ended_df = pd.DataFrame(columns=grouped.columns)
+    active_df['_days'] = None
+
+
+# ── 헬퍼 함수 ──
+def fmt_dday(days):
+    if pd.isna(days):
+        return ""
+    d = int(days)
+    if d == 0:
+        return "D-Day"
+    elif d > 0:
+        return f"D-{d}"
+    else:
+        return f"D+{-d}"
+
+
+def fmt_occupancy(seats, open_s):
+    if pd.isna(open_s) or int(open_s) == 0:
+        return "-"
+    return f"{min(seats / open_s * 100, 100.0):.1f}%"
+
+
+def fmt_money_man(val):
+    """원 → 만원 (반올림)"""
+    if pd.isna(val) or val == 0:
+        return "0"
+    return f"{int(round(val / 10000)):,}"
+
+
+def build_display_df(df, is_active=True):
+    """표시용 DataFrame 생성"""
+    rows = []
+    for _, r in df.iterrows():
+        seats = int(r['합계좌석']) if pd.notna(r['합계좌석']) else 0
+        open_s = int(r['오픈석']) if pd.notna(r['오픈석']) else 0
+        money = r['합계금액'] if pd.notna(r['합계금액']) else 0
+
+        row = {'공연명': r['공연명']}
+        if is_active:
+            row['D-day'] = fmt_dday(r.get('_days'))
         else:
-            daily_grouped['days_diff'] = 0
-            
-        def format_dday(d):
-            if pd.isna(d): return ""
-            if d == 0: return "D-Day"
-            elif d > 0: return f"D-{int(d)}"
-            else: return f"D+{int(-d)}"
-            
-        daily_grouped['D-day'] = daily_grouped['days_diff'].apply(format_dday)
-        
-        active_df = daily_grouped[daily_grouped['days_diff'] >= 0].copy()
-        ended_df = daily_grouped[daily_grouped['days_diff'] < 0].copy()
-        
-        active_df = active_df.sort_values('공연일(날짜)', ascending=True)
-        ended_df = ended_df.sort_values('공연일(날짜)', ascending=False)
-    else:
-        active_df = daily_grouped.copy()
-        ended_df = pd.DataFrame(columns=daily_grouped.columns)
-        active_df['D-day'] = ""
-
-    # 1. 판매중 공연 (카드 형태)
-    prev_seats = {}
-    if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in trend_df.columns and '합계좌석' in trend_df.columns:
-        try:
-            temp_trend = trend_df.copy()
-            temp_trend['기준일자'] = pd.to_datetime(temp_trend['기준일자'])
-            base_dt_val = pd.to_datetime(base_date)
-            past_trend = temp_trend[temp_trend['기준일자'] < base_dt_val].sort_values('기준일자')
-            latest_past = past_trend.groupby('공연명').last().reset_index()
-            prev_seats = dict(zip(latest_past['공연명'], latest_past['합계좌석']))
-        except Exception:
-            pass
-
-    if not active_df.empty:
-        n_active = len(active_df)
-        for i, (idx, row) in enumerate(active_df.iterrows()):
-            perf_name = row['공연명']
-            seats = int(row['합계좌석']) if pd.notna(row['합계좌석']) else 0
-            open_s = int(row['오픈석']) if pd.notna(row['오픈석']) else 0
-            money = int(row['합계금액']) if pd.notna(row['합계금액']) else 0
-            
-            if open_s == 0:
-                occupancy = "-"
+            if '공연일(날짜)' in r.index and pd.notna(r['공연일(날짜)']):
+                row['공연일'] = pd.to_datetime(r['공연일(날짜)']).strftime('%Y-%m-%d')
             else:
-                occ_val = min(seats / open_s * 100, 100.0)
-                occupancy = f"{occ_val:.1f}"
+                row['공연일'] = ''
 
-            with st.container():
-                st.markdown(f"**▶ {perf_name}**")
-                content = f"누적좌석: {seats:,}석({occupancy}{'%' if occupancy != '-' else ''})  \n"
-                content += f"누적금액: {money:,}원"
-                if perf_name in prev_seats:
-                    diff = seats - int(prev_seats[perf_name])
-                    if diff > 0:
-                        content += f"  \n전일대비: :green[+{diff:,}석]"
-                    elif diff < 0:
-                        content += f"  \n전일대비: :red[{diff:,}석]"
-                    else:
-                        content += f"  \n전일대비: :gray[+0석]"
-                st.markdown(content)
-            
-            if i < n_active - 1:
-                st.divider()
-    else:
-        st.info("현재 판매중인 공연이 없습니다.")
+        row['판매좌석'] = f"{seats:,}"
+        row['오픈석'] = f"{open_s:,}"
 
-    st.markdown("<br>", unsafe_allow_html=True)
+        col_name = '점유율(%)' if is_active else '최종 점유율(%)'
+        row[col_name] = fmt_occupancy(seats, open_s)
+        row['합계금액(만원)'] = fmt_money_man(money)
+        rows.append(row)
 
-    # 2. 종료 공연 (카드 형태)
-    if not ended_df.empty:
-        with st.expander("종료된 공연 보기"):
-            n_ended = len(ended_df)
-            for i, (idx, row) in enumerate(ended_df.iterrows()):
-                perf_name = row['공연명']
-                seats = int(row['합계좌석']) if pd.notna(row['합계좌석']) else 0
-                open_s = int(row['오픈석']) if pd.notna(row['오픈석']) else 0
-                money = int(row['합계금액']) if pd.notna(row['합계금액']) else 0
-                
-                if open_s == 0:
-                    occupancy = "-"
-                else:
-                    occ_val = min(seats / open_s * 100, 100.0)
-                    occupancy = f"{occ_val:.1f}"
+    return pd.DataFrame(rows)
 
-                with st.container():
-                    st.markdown(f"**▶ {perf_name}**")
-                    content = f"누적좌석: {seats:,}석({occupancy}{'%' if occupancy != '-' else ''})  \n"
-                    content += f"누적금액: {money:,}원"
-                    st.markdown(content)
-                
-                if i < n_ended - 1:
-                    st.divider()
 
-    # 이후 '공연별 점유율 비교' 차트 등을 위해 daily_grouped 를 판매중 공연 데이터로 교체
-    daily_grouped = active_df.copy()
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# 섹션 1: 상단 요약 metric
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+n_active = len(active_df)
+if not active_df.empty:
+    avg_occ = active_df.loc[active_df['오픈석'] > 0, '점유율'].mean()
+    avg_occ = avg_occ if pd.notna(avg_occ) else 0.0
+else:
+    avg_occ = 0.0
+
+col1, col2, col3 = st.columns(3)
+col1.metric("판매중 공연", f"{n_active}개")
+col2.metric("평균 점유율", f"{avg_occ:.1f}%")
+col3.metric("오늘 기준일자", base_date_str)
 
 st.markdown("---")
 
-if '공연명' in daily_df.columns:
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# 섹션 2: 판매중 공연 테이블
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+st.subheader("판매중 공연")
+
+if active_df.empty:
+    st.info("현재 판매중인 공연이 없습니다.")
+else:
+    disp = build_display_df(active_df, is_active=True)
+    right_cols = ['판매좌석', '오픈석', '점유율(%)', '합계금액(만원)']
+    col_config = {
+        c: st.column_config.TextColumn(c, width="small") for c in right_cols
+    }
+    st.dataframe(
+        disp,
+        use_container_width=True,
+        hide_index=True,
+        column_config=col_config,
+    )
+
+st.markdown("---")
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# 섹션 3: 종료 공연 (접힘)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+if not ended_df.empty:
+    with st.expander(f"종료된 공연 보기 ({len(ended_df)}건)"):
+        disp_ended = build_display_df(ended_df, is_active=False)
+        right_cols_ended = ['판매좌석', '오픈석', '최종 점유율(%)', '합계금액(만원)']
+        col_config_ended = {
+            c: st.column_config.TextColumn(c, width="small") for c in right_cols_ended
+        }
+        st.dataframe(
+            disp_ended,
+            use_container_width=True,
+            hide_index=True,
+            column_config=col_config_ended,
+        )
+
+st.markdown("---")
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# 섹션 4: 공연별 점유율 비교 차트 (판매중만)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+if not active_df.empty:
     st.subheader("📊 공연별 점유율 비교")
-    daily_grouped = daily_grouped.sort_values(by='점유율', ascending=True)
-    
+    chart_df = active_df.sort_values('점유율', ascending=True)
+
     fig = go.Figure()
     fig.add_trace(go.Bar(
-        x=daily_grouped['점유율'],
-        y=daily_grouped['공연명'],
+        x=chart_df['점유율'],
+        y=chart_df['공연명'],
         orientation='h',
         marker_color=COLORS['primary'],
-        text=[f"{val:.1f}%" for val in daily_grouped['점유율']],
-        textposition='auto'
+        text=[f"{v:.1f}%" for v in chart_df['점유율']],
+        textposition='auto',
     ))
-    
-    fig.add_vline(x=100, line_dash="dash", line_color=COLORS['danger'], annotation_text="100%", annotation_position="top right")
+    fig.add_vline(
+        x=100, line_dash="dash", line_color=COLORS['danger'],
+        annotation_text="100%", annotation_position="top right",
+    )
     fig.update_layout(xaxis_title="점유율 (%)", yaxis_title="")
     fig = apply_common_layout(fig)
     st.plotly_chart(fig, use_container_width=True)
 
 st.markdown("---")
 
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# 판매추이 (기존 유지)
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in trend_df.columns:
     st.subheader("📈 판매추이")
-    
+
     trend_metric = st.radio("지표 선택", ['합계좌석', '합계금액'], horizontal=True)
-    
+
     perf_list = trend_df['공연명'].unique().tolist()
     selected_perfs = st.multiselect("공연 선택", perf_list, default=perf_list)
-    
+
     filtered_trend = trend_df[trend_df['공연명'].isin(selected_perfs)].copy()
     filtered_trend = filtered_trend.sort_values(by='기준일자')
-    
+
     if trend_metric in filtered_trend.columns:
         fig2 = px.line(filtered_trend, x='기준일자', y=trend_metric, color='공연명', markers=True)
         fig2.update_layout(xaxis_title="기준일자", yaxis_title=trend_metric)
