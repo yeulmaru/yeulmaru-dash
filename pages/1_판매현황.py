@@ -3,10 +3,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
 from datetime import datetime
-import sys
-import os
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.data_loader import load_daily_input, load_sales_trend, get_base_date, load_performance_master
 from utils.charts import COLORS, apply_common_layout
 

@@ -1,10 +1,7 @@
 import streamlit as st
 import pandas as pd
-import sys
-import os
 from datetime import date
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.data_loader import (
     load_25_performance, load_daily_input,
     check_duplicate_entries, write_daily_entries_to_sharepoint,

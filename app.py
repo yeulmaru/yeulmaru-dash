@@ -1,8 +1,6 @@
 import streamlit as st
 import os
-import sys
 
-sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from utils.charts import ACCENT_COLOR
 
 st.set_page_config(

@@ -2,10 +2,7 @@ import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
-import sys
-import os
 
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.data_loader import load_yearly_performance, load_detailed_management
 from utils.charts import COLORS, apply_common_layout
 
