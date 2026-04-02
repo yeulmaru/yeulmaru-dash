@@ -39,7 +39,7 @@ weekdays_kr = ['월', '화', '수', '목', '금', '토', '일']
 
 # 오늘 (한국 시간 기준)
 now_dt = datetime.now(ZoneInfo("Asia/Seoul"))
-today_str = now_dt.strftime('%Y년 %m월 %d일') + f' ({weekdays_kr[now_dt.weekday()]})'
+today_str = now_dt.strftime('%Y년 %m월 %d일') + f' ({weekdays_kr[now_dt.weekday()]}) {now_dt.strftime("%H:%M")}'
 
 # 갱신일자 (엑셀 B2)
 if hasattr(base_date, 'weekday'):
