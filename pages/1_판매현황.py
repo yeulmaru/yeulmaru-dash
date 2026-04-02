@@ -24,7 +24,7 @@ st.markdown('''
 </style>
 ''', unsafe_allow_html=True)
 
-st.title("📊 [1] 실시간 판매현황")
+st.title("📊 실시간 판매현황")
 
 daily_df = load_daily_input()
 trend_df = load_sales_trend()
@@ -437,7 +437,7 @@ st.markdown("---")
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 섹션 2: 판매중 공연 테이블
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-st.subheader("공연 현황")
+st.subheader("[1] 공연 현황")
 
 if active_df.empty:
     st.info("현재 판매중인 공연이 없습니다.")
@@ -459,7 +459,7 @@ st.markdown("---")
 # 섹션 4: 공연별 점유율 비교 차트 (판매중만)
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 if not active_df.empty:
-    st.subheader("📊 [2] 공연별 점유율 비교")
+    st.subheader("[2] 공연별 점유율 비교")
 
     # 범례 (HTML, 2그룹 좌우 분리)
     leg_l, leg_r = st.columns(2)
@@ -701,7 +701,7 @@ st.markdown('<hr style="margin:8px 0;border-color:rgba(255,255,255,0.1);">', uns
 # 판매추이 (판매중 공연만)
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in trend_df.columns:
-    st.markdown('<div style="font-size:2rem;font-weight:700;margin:0 0 24px 0;">📈 [3] 판매추이</div>', unsafe_allow_html=True)
+    st.markdown('<div style="font-size:2rem;font-weight:700;margin:0 0 24px 0;">[3] 판매추이</div>', unsafe_allow_html=True)
 
     # ── 판매중 공연 목록 결정 ──
     # 1차: 공연마스터에 '상태' 컬럼이 있으면 '판매중'인 공연
