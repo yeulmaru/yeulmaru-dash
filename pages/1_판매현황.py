@@ -603,29 +603,40 @@ if not active_df.empty:
             lines += f'<br><span style="color:{dday_color};font-weight:bold">{dday_str}</span>'
         y_tick_texts.append(lines)
 
-    # 범례 (차트 영역 밖 상단, 가로 배치)
-    legend_text = (
-        '<span style="color:#AAA">■ 달성률</span>  '
-        '<span style="color:#FFFFFF">● 75%↑</span>  '
-        '<span style="color:#FFD700">● 50~75%</span>  '
-        '<span style="color:#FF8C00">● 25~50%</span>  '
-        '<span style="color:#FF4B4B">● ~25%</span>    '
-        '<span style="color:#FFD700">┆</span> <span style="color:#AAA">목표</span>  '
-        '<span style="color:#FF4B4B">┆</span> <span style="color:#AAA">100%</span>  '
-        '<span style="color:#555">─</span> <span style="color:#AAA">D-28</span>'
-    )
-    fig.add_annotation(
-        x=0.5, y=1.15, xref="paper", yref="paper",
-        xanchor="center", yanchor="bottom",
-        text=legend_text, showarrow=False,
-        font=dict(size=10, color="#AAA"),
-        bgcolor="rgba(0,0,0,0.5)", bordercolor="#333", borderwidth=1, borderpad=5,
-    )
+    # 범례 (dummy trace로 Plotly 네이티브 legend 사용)
+    for lbl, clr in [('75%↑', '#FFFFFF'), ('50~75%', '#FFD700'), ('25~50%', '#FF8C00'), ('~25%', '#FF4B4B')]:
+        fig.add_trace(go.Scatter(
+            x=[None], y=[None], mode='markers',
+            marker=dict(size=10, symbol='square', color=clr),
+            name=lbl, showlegend=True,
+        ))
+    fig.add_trace(go.Scatter(
+        x=[None], y=[None], mode='lines',
+        line=dict(color='#FFD700', width=2, dash='dot'),
+        name='공연별 목표', showlegend=True,
+    ))
+    fig.add_trace(go.Scatter(
+        x=[None], y=[None], mode='lines',
+        line=dict(color='#FF4B4B', width=2, dash='dash'),
+        name='100%', showlegend=True,
+    ))
+    fig.add_trace(go.Scatter(
+        x=[None], y=[None], mode='markers',
+        marker=dict(size=10, symbol='line-ew', color='#555', line=dict(width=2, color='#555')),
+        name='D-28', showlegend=True,
+    ))
 
     fig.update_layout(
         xaxis_title="", yaxis_title="",
         height=600,
         margin=dict(t=120, l=60),
+        showlegend=True,
+        legend=dict(
+            orientation='h', x=0.5, y=1.12,
+            xanchor='center', yanchor='bottom',
+            bgcolor='rgba(0,0,0,0.5)', bordercolor='#333', borderwidth=1,
+            font=dict(size=11, color='#AAA'),
+        ),
         xaxis=dict(
             tickvals=all_ticks, ticktext=tick_texts,
             showgrid=True, gridcolor="rgba(255,255,255,0.08)", gridwidth=1,
