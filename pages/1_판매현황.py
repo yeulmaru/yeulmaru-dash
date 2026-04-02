@@ -748,32 +748,43 @@ if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in 
     _commercial = [p for p in _default_perfs if _get_category(p) == '상업성']
     _public = [p for p in _default_perfs if _get_category(p) == '공공성']
 
-    # ── 체크리스트 CSS (수직 정렬 + 컴팩트) ──
+    # ── 체크리스트 CSS (컴팩트 + 수직 정렬) ──
     st.markdown("""
     <style>
-    .trend-cl [data-testid="stHorizontalBlock"] {
+    .trend-cl-box [data-testid="stVerticalBlock"] { gap: 0 !important; }
+    .trend-cl-box [data-testid="stHorizontalBlock"] {
         gap: 0 !important;
-        align-items: center;
+        align-items: center !important;
+        padding: 2px 8px !important;
         min-height: 0 !important;
+        border-bottom: 1px solid rgba(255,255,255,0.06);
     }
-    .trend-cl .stCheckbox { margin: 0 !important; }
-    .trend-cl .stCheckbox > label {
+    .trend-cl-box [data-testid="stHorizontalBlock"]:nth-child(odd) {
+        background: rgba(255,255,255,0.02);
+    }
+    .trend-cl-box [data-testid="stHorizontalBlock"]:nth-child(even) {
+        background: rgba(255,255,255,0.08);
+    }
+    .trend-cl-box [data-testid="stVerticalBlockBorderWrapper"] {
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+    .trend-cl-box [data-testid="column"] {
+        display: flex !important;
+        align-items: center !important;
+        padding: 0 !important;
+    }
+    .trend-cl-box .stCheckbox { margin: 0 !important; padding: 0 !important; }
+    .trend-cl-box .stCheckbox > label {
         padding: 0 !important;
         min-height: 0 !important;
-        display: flex;
-        align-items: center;
+        margin: 0 !important;
+        display: flex !important;
+        align-items: center !important;
     }
-    .trend-cl .stCheckbox > label > span:first-child {
-        display: flex;
-        align-items: center;
-    }
-    .trend-cl [data-testid="stVerticalBlockBorderWrapper"] {
-        padding: 0 !important;
-    }
-    .trend-cl [data-testid="column"] {
-        display: flex;
-        align-items: center;
-    }
+    .trend-cl-box .stCheckbox > label > span { margin: 0 !important; }
+    .trend-cl-box .stMarkdown { margin: 0 !important; padding: 0 !important; }
+    .trend-cl-box .stMarkdown p { margin: 0 !important; padding: 0 !important; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -786,37 +797,30 @@ if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in 
             st.markdown(f'<div style="{_LABEL_STYLE}">{title}</div>', unsafe_allow_html=True)
             _cont = st.container(key=f"trend_cl_{title}")
             with _cont:
-                st.markdown('<div class="trend-cl">', unsafe_allow_html=True)
+                # 체크 행 강조 CSS (동적, 체크 상태 기반)
+                _highlight_css = '<style>'
                 for i, pname in enumerate(perf_names):
-                    date_str = perf_date_map.get(pname, '')
                     checked = st.session_state.get(f"_trend_cb_{pname}", True)
                     if checked:
-                        bg = "rgba(15,253,2,0.08)"
-                    elif i % 2 == 1:
-                        bg = "rgba(255,255,255,0.04)"
-                    else:
-                        bg = "transparent"
-                    border_b = "border-bottom:1px solid rgba(255,255,255,0.08);" if i < len(perf_names) - 1 else ""
+                        _highlight_css += (
+                            f'div[data-testid="stVerticalBlock"][data-st-key="trend_cl_{title}"]'
+                            f' > [data-testid="stVerticalBlockBorderWrapper"]:nth-child({i + 1})'
+                            f' [data-testid="stHorizontalBlock"]'
+                            f' {{ background: rgba(15,253,2,0.08) !important; }}'
+                        )
+                _highlight_css += '</style>'
+                st.markdown(_highlight_css, unsafe_allow_html=True)
 
-                    # 행 배경 래퍼
-                    st.markdown(
-                        f'<div style="background:{bg};{border_b};margin:0 -1rem;padding:0 1rem;">',
-                        unsafe_allow_html=True,
-                    )
+                st.markdown('<div class="trend-cl-box">', unsafe_allow_html=True)
+                for i, pname in enumerate(perf_names):
+                    date_str = perf_date_map.get(pname, '')
                     col_cb, col_date, col_name = st.columns([0.05, 0.28, 0.67])
                     with col_cb:
                         st.checkbox(" ", key=f"_trend_cb_{pname}", label_visibility="collapsed")
                     with col_date:
-                        st.markdown(
-                            f'<div style="color:#FFF;font-size:13px;line-height:1.4;">{date_str}</div>',
-                            unsafe_allow_html=True,
-                        )
+                        st.markdown(f'<div style="color:#FFF;font-size:13px;">{date_str}</div>', unsafe_allow_html=True)
                     with col_name:
-                        st.markdown(
-                            f'<div style="color:#FFF;font-size:13px;line-height:1.4;">{pname}</div>',
-                            unsafe_allow_html=True,
-                        )
-                    st.markdown('</div>', unsafe_allow_html=True)
+                        st.markdown(f'<div style="color:#FFF;font-size:13px;">{pname}</div>', unsafe_allow_html=True)
                 st.markdown('</div>', unsafe_allow_html=True)
 
     _render_checklist(_tbl_left, "상업성", _commercial)
