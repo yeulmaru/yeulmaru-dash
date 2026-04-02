@@ -753,10 +753,10 @@ if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in 
     _ctrl1, _ctrl2, _ctrl_spacer = st.columns([2.5, 1.5, 4])
     _LBL = 'font-size:15px;font-weight:bold;color:#0FFD02;margin:0 0 2px 0;'
     with _ctrl1:
-        st.markdown(f'<div style="{_LBL}">지표 선택</div>', unsafe_allow_html=True)
+        st.markdown(f'<div style="{_LBL}">[1] 지표 선택</div>', unsafe_allow_html=True)
         trend_metric = st.radio("지표 선택", ['점유율(%)', '합계좌석', '합계금액'], horizontal=True, label_visibility="collapsed")
     with _ctrl2:
-        st.markdown(f'<div style="{_LBL}">기간 단위</div>', unsafe_allow_html=True)
+        st.markdown(f'<div style="{_LBL}">[2] 기간 단위</div>', unsafe_allow_html=True)
         trend_resample = st.radio("기간 단위", ['일별', '주별', '월별'], index=1, horizontal=True, label_visibility="collapsed")
 
     perf_list = trend_df['공연명'].unique().tolist()
