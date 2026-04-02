@@ -478,15 +478,15 @@ if not active_df.empty:
         if pd.notna(d_cur) and pd.notna(d_next) and d_cur > 28 and d_next <= 28:
             separator_y = i + 0.5
 
-    # 막대 텍스트: "28.4% (263/926)"
-    bar_texts = []
+    # 막대 텍스트 데이터 준비 (annotation으로 표시)
+    bar_text_data = []
     for _, row in chart_df.iterrows():
         occ = row['점유율']
         sold = int(row['합계좌석']) if pd.notna(row['합계좌석']) else 0
         base_s = int(row['오픈석']) if pd.notna(row.get('오픈석')) else FALLBACK_SEAT
         rounds = int(row['_회차수']) if pd.notna(row.get('_회차수')) else 1
         total = base_s * rounds
-        bar_texts.append(f"{occ:.1f}% ({sold:,}/{total:,})")
+        bar_text_data.append((occ, sold, total))
 
     fig = go.Figure()
     fig.add_trace(go.Bar(
@@ -495,9 +495,7 @@ if not active_df.empty:
         orientation='h',
         width=0.3,
         marker=dict(color=colors, opacity=opacities),
-        text=bar_texts,
-        textposition='outside',
-        textfont=dict(color='#FFFFFF', size=12),
+        text=[''] * len(chart_df),
         cliponaxis=False,
         customdata=list(zip(
             chart_df['_days'].fillna(0).astype(int),
@@ -516,6 +514,19 @@ if not active_df.empty:
             '<extra></extra>'
         ),
     ))
+
+    # 막대 바깥 텍스트 (annotation으로 강조색 적용)
+    G = '#0FFD02'
+    for i, (occ, sold, total) in enumerate(bar_text_data):
+        html_text = (
+            f'<span style="color:{G}">{occ:.1f}</span>%'
+            f' (<span style="color:{G}">{sold:,}</span>/{total:,})'
+        )
+        fig.add_annotation(
+            x=occ + 1, y=y_labels[i], yref="y",
+            text=html_text, showarrow=False,
+            xanchor='left', font=dict(size=12, color='#FFFFFF'),
+        )
 
     # 100% 기준선
     fig.add_vline(x=100, line_dash="dash", line_color=COLORS['danger'],
