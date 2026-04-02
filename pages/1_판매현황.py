@@ -5,7 +5,7 @@ import plotly.express as px
 import sys
 import os
 
-sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from utils.data_loader import load_daily_input, load_sales_trend, get_base_date
 from utils.charts import COLORS, apply_common_layout
 
@@ -61,7 +61,7 @@ if '공연명' in daily_df.columns:
         agg_dict['공연일(날짜)'] = 'min'
         
     daily_grouped = daily_df.groupby('공연명').agg(agg_dict).reset_index()
-    daily_grouped['점유율'] = (daily_grouped['합계좌석'] / daily_grouped['오픈석'].replace(0, float('nan')) * 100).fillna(0)
+    daily_grouped['점유율'] = (daily_grouped['합계좌석'] / daily_grouped['오픈석'].replace(0, float('nan')) * 100).fillna(0).clip(upper=100.0)
 
     if '공연일(날짜)' in daily_grouped.columns:
         base_dt = pd.to_datetime(base_date, errors='coerce')
@@ -112,11 +112,12 @@ if '공연명' in daily_df.columns:
             if open_s == 0:
                 occupancy = "-"
             else:
-                occupancy = f"{(seats / open_s * 100):.1f}"
-                
+                occ_val = min(seats / open_s * 100, 100.0)
+                occupancy = f"{occ_val:.1f}"
+
             with st.container():
                 st.markdown(f"**▶ {perf_name}**")
-                content = f"누적좌석: {seats:,}석({occupancy}%)  \n"
+                content = f"누적좌석: {seats:,}석({occupancy}{'%' if occupancy != '-' else ''})  \n"
                 content += f"누적금액: {money:,}원"
                 if perf_name in prev_seats:
                     diff = seats - int(prev_seats[perf_name])
@@ -148,11 +149,12 @@ if '공연명' in daily_df.columns:
                 if open_s == 0:
                     occupancy = "-"
                 else:
-                    occupancy = f"{(seats / open_s * 100):.1f}"
-                    
+                    occ_val = min(seats / open_s * 100, 100.0)
+                    occupancy = f"{occ_val:.1f}"
+
                 with st.container():
                     st.markdown(f"**▶ {perf_name}**")
-                    content = f"누적좌석: {seats:,}석({occupancy}%)  \n"
+                    content = f"누적좌석: {seats:,}석({occupancy}{'%' if occupancy != '-' else ''})  \n"
                     content += f"누적금액: {money:,}원"
                     st.markdown(content)
                 

@@ -252,39 +252,31 @@ def _get_sharepoint_file_meta():
 
 # ── SharePoint 엑셀 쓰기 ──
 
-def _find_last_literal_data_row(base_url, headers, ws_id):
-    """누적 로그 영역에서 마지막 리터럴(수식이 아닌) 데이터 행 번호(1-based)를 반환.
-    수식 미리보기 행, 안내 텍스트 행은 건너뜀."""
-    import re
-
-    # formulas를 포함한 usedRange 조회
-    url = f"{base_url}/worksheets/{ws_id}/usedRange"
+def _find_last_data_row(base_url, headers, ws_id):
+    """누적 로그 영역에서 마지막 데이터 행 번호(1-based)를 반환"""
+    url = f"{base_url}/worksheets/{ws_id}/usedRange(valuesOnly=true)"
     resp = requests.get(url, headers=headers)
     resp.raise_for_status()
     data = resp.json()
+    row_count = data.get("rowCount", 0)
 
+    # usedRange의 마지막 행부터 위로 탐색하며 실제 데이터 행 찾기
+    # 안내 텍스트(이모지로 시작)나 빈 행을 건너뛰고 yyyymmdd 숫자인 행을 찾음
     addr = data.get("address", "")
+    # address 예: '일일입력!A1:R2526' → 시작 행 추출
     start_row = 1
     if "!" in addr:
-        m = re.search(r'(\d+)', addr.split("!")[1])
+        range_part = addr.split("!")[1]
+        import re
+        m = re.search(r'(\d+)', range_part)
         if m:
             start_row = int(m.group(1))
 
     values = data.get("values", [])
-    formulas = data.get("formulas", [])
-
-    # 아래에서 위로 탐색: A열이 yyyymmdd이고 수식이 아닌 리터럴 행
     for i in range(len(values) - 1, -1, -1):
         cell_a = values[i][0]
         if cell_a is None or cell_a == "":
             continue
-
-        # 수식 행 건너뛰기
-        if formulas and i < len(formulas):
-            formula_a = str(formulas[i][0]) if formulas[i][0] else ""
-            if formula_a.startswith("="):
-                continue
-
         try:
             val = int(float(cell_a))
             if 20000000 < val < 30000000:  # yyyymmdd 범위
@@ -292,7 +284,7 @@ def _find_last_literal_data_row(base_url, headers, ws_id):
         except (ValueError, TypeError):
             continue
 
-    return start_row + len(values) - 1
+    return start_row + row_count - 1
 
 
 def check_duplicate_entries(entries):
@@ -322,9 +314,7 @@ def check_duplicate_entries(entries):
 
 def write_daily_entries_to_sharepoint(entries):
     """일일입력 시트 누적 로그 영역에 새 행을 추가.
-    방식: 마지막 데이터 행 다음에 N행 insert(shift=Down) → 빈 행에 PATCH.
-    이렇게 하면 안내 텍스트/수식 행이 아래로 밀리고 데이터가 확실히 저장됨.
-    entries: list of dict
+    entries: list of dict (기준일자, 공연명, 공연일, 회차/시각, 오픈석, ...)
     반환: (success: bool, message: str)
     """
     try:
@@ -348,8 +338,8 @@ def write_daily_entries_to_sharepoint(entries):
         if not ws_id:
             return False, "일일입력 워크시트를 찾을 수 없습니다."
 
-        # 마지막 리터럴 데이터 행 찾기 (수식 행 제외)
-        last_row = _find_last_literal_data_row(base_url, headers, ws_id)
+        # 마지막 데이터 행 찾기
+        last_row = _find_last_data_row(base_url, headers, ws_id)
 
         # 쓸 데이터 행 구성 (A~Q, 17열)
         rows = []
@@ -358,14 +348,14 @@ def write_daily_entries_to_sharepoint(entries):
             total_seats = entry['합계좌석']
             total_amount = entry['합계금액']
             open_seats = entry['오픈석']
-            occupancy = min(total_seats / open_seats, 1.0) if open_seats > 0 else 0
+            occupancy = (total_seats / open_seats) if open_seats > 0 else 0
             unit_price = (total_amount / total_seats) if total_seats > 0 else 0
 
             row = [
                 int(date_str),              # A: 기준일자
                 entry['공연명'],            # B: 공연명
                 entry.get('공연일', ''),     # C: 공연일
-                "'" + entry.get('회차/시각', '') if entry.get('회차/시각') else '',  # D: 회차/시각
+                "'" + entry.get('회차/시각', '') if entry.get('회차/시각') else '',  # D: 회차/시각 (앞에 '로 텍스트 강제)
                 open_seats,                 # E: 오픈석
                 entry['유료좌석'],          # F: 유료좌석
                 entry['유료금액'],          # G: 유료금액
@@ -382,36 +372,25 @@ def write_daily_entries_to_sharepoint(entries):
             ]
             rows.append(row)
 
-        n = len(rows)
-        insert_start = last_row + 1
-        insert_end = insert_start + n - 1
-        address = f"A{insert_start}:Q{insert_end}"
+        # 쓰기 시작 행 = 마지막 데이터 행 + 1
+        start_row = last_row + 1
+        end_row = start_row + len(rows) - 1
+        address = f"A{start_row}:Q{end_row}"
 
-        # Step 1: N행 삽입 (기존 행을 아래로 밀기)
-        insert_url = f"{base_url}/worksheets/{ws_id}/range(address='{address}')/insert"
-        insert_resp = requests.post(insert_url, headers=headers, json={"shift": "Down"})
-        if insert_resp.status_code != 200:
-            error_detail = insert_resp.json().get("error", {}).get("message", insert_resp.text[:300])
-            return False, f"행 삽입 실패 ({insert_resp.status_code}): {error_detail}"
-
-        # Step 2: 삽입된 빈 행에 데이터 쓰기
         patch_url = f"{base_url}/worksheets/{ws_id}/range(address='{address}')"
-        patch_resp = requests.patch(patch_url, headers=headers, json={"values": rows})
+        body = {"values": rows}
+        resp = requests.patch(patch_url, headers=headers, json=body)
 
-        if patch_resp.status_code == 200:
-            # 쓰인 값 검증
-            written = patch_resp.json().get("values", [])
-            written_count = sum(1 for r in written if r[0] and r[1])
-
-            # 캐시 초기화
+        if resp.status_code == 200:
+            # 캐시 초기화 (새 데이터 반영)
             load_daily_input.clear()
             load_sales_trend.clear()
             get_base_date.clear()
             download_excel_from_sharepoint.clear()
-            return True, f"{written_count}건 저장 완료 (행 {insert_start}~{insert_end})"
+            return True, f"{len(rows)}건 저장 완료 (행 {start_row}~{end_row})"
         else:
-            error_detail = patch_resp.json().get("error", {}).get("message", patch_resp.text[:300])
-            return False, f"데이터 쓰기 실패 ({patch_resp.status_code}): {error_detail}"
+            error_detail = resp.json().get("error", {}).get("message", resp.text[:300])
+            return False, f"Graph API 오류 ({resp.status_code}): {error_detail}"
 
     except FileNotFoundError as e:
         return False, str(e)

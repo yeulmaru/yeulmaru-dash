@@ -358,7 +358,7 @@ def write_daily_entries_to_sharepoint(entries):
             total_seats = entry['합계좌석']
             total_amount = entry['합계금액']
             open_seats = entry['오픈석']
-            occupancy = min(total_seats / open_seats, 1.0) if open_seats > 0 else 0
+            occupancy = (total_seats / open_seats) if open_seats > 0 else 0
             unit_price = (total_amount / total_seats) if total_seats > 0 else 0
 
             row = [
