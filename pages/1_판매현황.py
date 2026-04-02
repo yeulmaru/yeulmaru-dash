@@ -12,6 +12,17 @@ st.set_page_config(page_title="실시간 판매현황", page_icon="📊", layout
 from utils.auth import check_password
 check_password()
 
+st.markdown('''
+<style>
+[data-testid="stDataFrame"] tbody tr:nth-child(even) {
+    background-color: rgba(255,255,255,0.06) !important;
+}
+[data-testid="stDataFrame"] tbody tr:nth-child(odd) {
+    background-color: rgba(255,255,255,0.01) !important;
+}
+</style>
+''', unsafe_allow_html=True)
+
 st.title("📊 실시간 판매현황")
 
 daily_df = load_daily_input()
