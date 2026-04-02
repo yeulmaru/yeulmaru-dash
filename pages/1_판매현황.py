@@ -748,71 +748,63 @@ if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in 
     _commercial = [p for p in _default_perfs if _get_category(p) == '상업성']
     _public = [p for p in _default_perfs if _get_category(p) == '공공성']
 
-    # ── 체크리스트 CSS (컴팩트 + 수직 정렬) ──
-    st.markdown("""
-    <style>
-    .trend-cl-box [data-testid="stVerticalBlock"] { gap: 0 !important; }
-    .trend-cl-box [data-testid="stHorizontalBlock"] {
-        gap: 0 !important;
-        align-items: center !important;
-        padding: 2px 8px !important;
-        min-height: 0 !important;
-        border-bottom: 1px solid rgba(255,255,255,0.06);
-    }
-    .trend-cl-box [data-testid="stHorizontalBlock"]:nth-child(odd) {
-        background: rgba(255,255,255,0.02);
-    }
-    .trend-cl-box [data-testid="stHorizontalBlock"]:nth-child(even) {
-        background: rgba(255,255,255,0.08);
-    }
-    .trend-cl-box [data-testid="stVerticalBlockBorderWrapper"] {
-        padding: 0 !important;
-        margin: 0 !important;
-    }
-    .trend-cl-box [data-testid="column"] {
-        display: flex !important;
-        align-items: center !important;
-        padding: 0 !important;
-    }
-    .trend-cl-box .stCheckbox { margin: 0 !important; padding: 0 !important; }
-    .trend-cl-box .stCheckbox > label {
-        padding: 0 !important;
-        min-height: 0 !important;
-        margin: 0 !important;
-        display: flex !important;
-        align-items: center !important;
-    }
-    .trend-cl-box .stCheckbox > label > span { margin: 0 !important; }
-    .trend-cl-box .stMarkdown { margin: 0 !important; padding: 0 !important; }
-    .trend-cl-box .stMarkdown p { margin: 0 !important; padding: 0 !important; }
-    </style>
-    """, unsafe_allow_html=True)
-
     _LABEL_STYLE = 'font-size:15px;font-weight:bold;color:#0FFD02;margin:0 0 2px 0;'
+
+    def _build_checklist_css(title, perf_names):
+        """컨테이너 key 기반으로 행별 배경 + 컴팩트 CSS 생성"""
+        key = f"trend_cl_{title}"
+        sel = f'div[data-testid="stVerticalBlock"][data-st-key="{key}"]'
+        css = f"""
+        {sel} {{ gap: 0 !important; }}
+        {sel} > [data-testid="stVerticalBlockBorderWrapper"] {{
+            padding: 0 !important; margin: 0 !important;
+        }}
+        {sel} [data-testid="stHorizontalBlock"] {{
+            gap: 0 !important; align-items: center !important;
+            padding: 2px 8px !important; min-height: 0 !important;
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+        }}
+        {sel} [data-testid="column"] {{
+            display: flex !important; align-items: center !important; padding: 0 !important;
+        }}
+        {sel} .stCheckbox {{
+            margin: 0 !important; padding: 0 !important;
+        }}
+        {sel} .stCheckbox > label {{
+            padding: 0 !important; min-height: 0 !important;
+            margin: 0 !important; display: flex !important; align-items: center !important;
+        }}
+        {sel} .stCheckbox > label > span {{ margin: 0 !important; }}
+        {sel} .stMarkdown {{ margin: 0 !important; padding: 0 !important; }}
+        {sel} .stMarkdown p {{ margin: 0 !important; padding: 0 !important; }}
+        """
+        # 행별 배경: 홀짝 + 체크 강조
+        for i, pname in enumerate(perf_names):
+            # nth-child는 1-based, st.markdown(CSS)가 첫 자식이므로 실제 행은 i+2부터
+            nth = i + 2
+            checked = st.session_state.get(f"_trend_cb_{pname}", True)
+            if checked:
+                bg = "rgba(15,253,2,0.08)"
+            elif i % 2 == 1:
+                bg = "rgba(255,255,255,0.08)"
+            else:
+                bg = "rgba(255,255,255,0.02)"
+            css += f"""
+            {sel} > [data-testid="stVerticalBlockBorderWrapper"]:nth-child({nth})
+            [data-testid="stHorizontalBlock"] {{ background: {bg} !important; }}
+            """
+        return css
 
     _tbl_left, _tbl_right = st.columns(2)
 
     def _render_checklist(container, title, perf_names):
         with container:
             st.markdown(f'<div style="{_LABEL_STYLE}">{title}</div>', unsafe_allow_html=True)
+            # CSS를 먼저 주입
+            st.markdown(f'<style>{_build_checklist_css(title, perf_names)}</style>', unsafe_allow_html=True)
             _cont = st.container(key=f"trend_cl_{title}")
             with _cont:
-                # 체크 행 강조 CSS (동적, 체크 상태 기반)
-                _highlight_css = '<style>'
-                for i, pname in enumerate(perf_names):
-                    checked = st.session_state.get(f"_trend_cb_{pname}", True)
-                    if checked:
-                        _highlight_css += (
-                            f'div[data-testid="stVerticalBlock"][data-st-key="trend_cl_{title}"]'
-                            f' > [data-testid="stVerticalBlockBorderWrapper"]:nth-child({i + 1})'
-                            f' [data-testid="stHorizontalBlock"]'
-                            f' {{ background: rgba(15,253,2,0.08) !important; }}'
-                        )
-                _highlight_css += '</style>'
-                st.markdown(_highlight_css, unsafe_allow_html=True)
-
-                st.markdown('<div class="trend-cl-box">', unsafe_allow_html=True)
-                for i, pname in enumerate(perf_names):
+                for pname in perf_names:
                     date_str = perf_date_map.get(pname, '')
                     col_cb, col_date, col_name = st.columns([0.05, 0.28, 0.67])
                     with col_cb:
@@ -821,7 +813,6 @@ if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in 
                         st.markdown(f'<div style="color:#FFF;font-size:13px;">{date_str}</div>', unsafe_allow_html=True)
                     with col_name:
                         st.markdown(f'<div style="color:#FFF;font-size:13px;">{pname}</div>', unsafe_allow_html=True)
-                st.markdown('</div>', unsafe_allow_html=True)
 
     _render_checklist(_tbl_left, "상업성", _commercial)
     _render_checklist(_tbl_right, "공공성", _public)
