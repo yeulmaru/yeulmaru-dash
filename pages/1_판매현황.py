@@ -330,7 +330,7 @@ def build_html_table(df, is_active=True):
 
         html += f'<tr style="border-bottom:1px solid #333;{border_top}">'
         # 공연일
-        html += f'<td style="padding:8px 12px;color:#AAA;">{date_str}</td>'
+        html += f'<td style="padding:8px 12px;color:{dday_col};">{date_str}</td>'
         # 공연명
         html += f'<td style="padding:8px 12px;color:{dday_col};">{r["공연명"]}</td>'
         # D-day
