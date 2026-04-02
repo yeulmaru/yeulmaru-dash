@@ -71,6 +71,10 @@ today_rows = daily_df[daily_df['_sort_key'] < 100]
 
 grouped = daily_df.sort_values('_sort_key').groupby('공연명').last().reset_index()
 
+# 공연일(날짜) 컬럼을 datetime으로 통일 (수식 셀이 str/nan 혼재 → dtype 충돌 방지)
+if '공연일(날짜)' in grouped.columns:
+    grouped['공연일(날짜)'] = pd.to_datetime(grouped['공연일(날짜)'], errors='coerce')
+
 # 공연마스터 기반 오픈석 + 공연일 계산
 _debug_match = []
 perf_date_map = {}
