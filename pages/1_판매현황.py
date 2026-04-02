@@ -47,20 +47,42 @@ if '공연명' not in daily_df.columns:
     st.stop()
 
 daily_df['_sort_key'] = pd.to_numeric(daily_df['No'], errors='coerce')
+
+# ── 오픈석 보정: 기본좌석 × 회차수 (엑셀 원본값 무시, 무조건 재계산) ──
+# 당일 데이터(No < 100)에서 같은 공연명의 행 수 = 회차수
+today_rows = daily_df[daily_df['_sort_key'] < 100]
+round_count_map = today_rows.groupby('공연명').size().to_dict()
+
+BASE_SEAT_DEFAULT = 926  # 대극장 기본좌석
+
 grouped = daily_df.sort_values('_sort_key').groupby('공연명').last().reset_index()
-# 점유율: 엑셀 원본값 우선 사용, 없으면 합계좌석/오픈석 fallback
-if '점유율' in grouped.columns:
-    raw = pd.to_numeric(grouped['점유율'], errors='coerce')
-    # 소수(0~1 범위)면 ×100, 이미 %면 그대로
-    raw = raw.where(raw.isna(), raw.apply(lambda v: v * 100 if pd.notna(v) and v <= 1 else v))
-    fallback = (
-        grouped['합계좌석'] / grouped['오픈석'].replace(0, float('nan')) * 100
-    ).clip(upper=100.0)
-    grouped['점유율'] = raw.fillna(fallback).fillna(0)
-else:
-    grouped['점유율'] = (
-        grouped['합계좌석'] / grouped['오픈석'].replace(0, float('nan')) * 100
-    ).fillna(0).clip(upper=100.0)
+
+# 오픈석 / 누적오픈석 분리 계산
+for idx, row in grouped.iterrows():
+    name = row['공연명']
+    rounds = round_count_map.get(name, 1)
+    grouped.at[idx, '오픈석'] = BASE_SEAT_DEFAULT
+    grouped.at[idx, '누적오픈석'] = BASE_SEAT_DEFAULT * rounds
+    grouped.at[idx, '_회차수'] = rounds
+
+# 점유율: 누적오픈석 기준
+grouped['점유율'] = (
+    grouped['합계좌석'] / grouped['누적오픈석'].replace(0, float('nan')) * 100
+).fillna(0).clip(upper=100.0)
+
+# ── 디버그: 오픈석 보정 결과 ──
+with st.sidebar.expander("디버그: 오픈석 보정"):
+    debug_rows = []
+    for _, r in grouped.iterrows():
+        debug_rows.append({
+            '공연명': r['공연명'],
+            '회차수': int(r['_회차수']),
+            '기본좌석': BASE_SEAT_DEFAULT,
+            '누적오픈석': int(r['누적오픈석']),
+            '합계좌석': int(r['합계좌석']) if pd.notna(r['합계좌석']) else 0,
+            '점유율': f"{r['점유율']:.1f}%",
+        })
+    st.dataframe(pd.DataFrame(debug_rows), use_container_width=True, hide_index=True)
 
 # ── 전일대비 계산 (판매추이 시트에서 최신 2일치 비교) ──
 daily_diff = {}
@@ -140,12 +162,26 @@ def _dday_color(days):
 ACCENT = "#0FFD02"
 
 
+def _dday_zone(days):
+    """D-day 구간 반환: 0=D-0~13, 1=D-14~27, 2=D-28+, -1=종료/없음"""
+    if pd.isna(days):
+        return -1
+    d = int(days)
+    if d < 0:
+        return -1
+    if d < 14:
+        return 0
+    if d < 28:
+        return 1
+    return 2
+
+
 def build_html_table(df, is_active=True):
     """HTML 테이블 생성"""
     if is_active:
-        headers = ['공연명', 'D-day', '판매좌석', '오픈석', '점유율(%)', '합계금액', '전일대비']
+        headers = ['공연명', 'D-day', '판매좌석', '오픈석(누적)', '점유율(%)', '합계금액', '전일대비']
     else:
-        headers = ['공연명', '공연일', '판매좌석', '오픈석', '최종 점유율(%)', '합계금액', '전일대비']
+        headers = ['공연명', '공연일', '판매좌석', '오픈석(누적)', '최종 점유율(%)', '합계금액', '전일대비']
 
     right_align_cols = {2, 3, 4, 5, 6}  # 판매좌석~전일대비
 
@@ -157,18 +193,28 @@ def build_html_table(df, is_active=True):
         html += f'<th style="text-align:{align};padding:8px 12px;border-bottom:2px solid #444;color:#AAA;font-weight:600;">{h}</th>'
     html += '</tr>'
 
-    # 행
+    # 행 — D-day 구간 경계에 구분선 삽입
+    prev_zone = None
     for _, r in df.iterrows():
         days = r.get('_days')
         dday_col = _dday_color(days)
         seats = int(r['합계좌석']) if pd.notna(r['합계좌석']) else 0
-        open_s = int(r['오픈석']) if pd.notna(r['오픈석']) else 0
+        cumul_s = int(r['누적오픈석']) if pd.notna(r.get('누적오픈석')) else 0
+        open_str = f"{cumul_s:,}석"
         money = r['합계금액'] if pd.notna(r['합계금액']) else 0
         occ = fmt_occupancy(r.get('점유율'))
         diff_str = fmt_daily_diff(r['공연명'])
         money_str = fmt_money_man(money)
 
-        html += '<tr style="border-bottom:1px solid #333;">'
+        # 구간 경계 구분선 (D-14, D-28 경계)
+        cur_zone = _dday_zone(days) if is_active else -1
+        if is_active and prev_zone is not None and cur_zone != prev_zone:
+            border_top = 'border-top:2px solid #555;'
+        else:
+            border_top = ''
+        prev_zone = cur_zone
+
+        html += f'<tr style="border-bottom:1px solid #333;{border_top}">'
         # 공연명
         html += f'<td style="padding:8px 12px;color:{dday_col};">{r["공연명"]}</td>'
         # D-day / 공연일
@@ -181,8 +227,8 @@ def build_html_table(df, is_active=True):
             html += f'<td style="padding:8px 12px;">{dt_str}</td>'
         # 판매좌석 (강조)
         html += f'<td style="padding:8px 12px;text-align:right;color:{ACCENT};font-weight:600;">{seats:,}석</td>'
-        # 오픈석 (기본)
-        html += f'<td style="padding:8px 12px;text-align:right;">{open_s:,}석</td>'
+        # 오픈석(누적)
+        html += f'<td style="padding:8px 12px;text-align:right;">{open_str}</td>'
         # 점유율 (강조)
         html += f'<td style="padding:8px 12px;text-align:right;color:{ACCENT};font-weight:600;">{occ}</td>'
         # 합계금액 (기본)
@@ -248,8 +294,8 @@ if not active_df.empty:
         marker_color=COLORS['primary'],
         text=[f"{v:.1f}%" for v in chart_df['점유율']],
         textposition='auto',
-        customdata=chart_df[['합계좌석', '오픈석']].values,
-        hovertemplate='%{y}<br>점유율: %{x:.1f}%<br>판매좌석: %{customdata[0]:,}<br>오픈석(참고): %{customdata[1]:,}<extra></extra>',
+        customdata=chart_df[['합계좌석', '누적오픈석']].values,
+        hovertemplate='%{y}<br>점유율: %{x:.1f}%<br>판매좌석: %{customdata[0]:,}<br>누적오픈석: %{customdata[1]:,}<extra></extra>',
     ))
     fig.add_vline(
         x=100, line_dash="dash", line_color=COLORS['danger'],
