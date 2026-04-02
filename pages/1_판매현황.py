@@ -717,61 +717,62 @@ if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in 
     # ── 커스텀 체크리스트 CSS ──
     st.markdown("""
     <style>
-    div[data-testid="stHorizontalBlock"].perf-checklist-row .stCheckbox {margin:0;padding:0;}
-    div[data-testid="stHorizontalBlock"].perf-checklist-row .stCheckbox > label {padding:0 !important;}
-    .perf-row-on {
-        background: rgba(0,20,60,0.8);
+    .perf-checklist {
+        border: 1px solid rgba(255,255,255,0.15);
         border-radius: 4px;
+        overflow: hidden;
+    }
+    .perf-row-on {
+        background: rgba(0,255,2,0.08);
         padding: 4px 10px;
-        margin-bottom: 2px;
         font-size: 13px;
         color: #0FFD02;
         display: flex;
         align-items: center;
         gap: 12px;
+        border-bottom: 1px solid rgba(255,255,255,0.1);
     }
     .perf-row-off {
-        background: rgba(255,255,255,0.05);
-        border-radius: 4px;
+        background: rgba(255,255,255,0.02);
         padding: 4px 10px;
-        margin-bottom: 2px;
         font-size: 13px;
         color: #666;
         display: flex;
         align-items: center;
         gap: 12px;
+        border-bottom: 1px solid rgba(255,255,255,0.1);
     }
+    .perf-checklist > div:last-child .perf-row-on,
+    .perf-checklist > div:last-child .perf-row-off { border-bottom: none; }
     .perf-date { min-width: 140px; }
     </style>
     """, unsafe_allow_html=True)
 
-    # ── 공연 체크리스트 ──
-    selected_perfs = []
+    # ── 공연 체크리스트 (체크 상태 수집) ──
+    _perf_checks = {}
+    for pname in _default_perfs:
+        cb_key = f"_trend_cb_{pname}"
+        _perf_checks[pname] = st.checkbox(pname, value=True, key=cb_key, label_visibility="collapsed")
+
+    # ── 체크리스트 HTML 렌더링 ──
+    _cl_html = '<div class="perf-checklist">'
     for pname in _default_perfs:
         date_str = perf_date_map.get(pname, '')
-        cb_key = f"_trend_cb_{pname}"
-        col_cb, col_label = st.columns([0.04, 0.96])
-        with col_cb:
-            checked = st.checkbox(" ", value=True, key=cb_key, label_visibility="collapsed")
-        with col_label:
-            if checked:
-                st.markdown(
-                    f'<div class="perf-row-on">'
-                    f'<span class="perf-date">{date_str}</span>'
-                    f'<span>{pname}</span>'
-                    f'</div>',
-                    unsafe_allow_html=True,
-                )
-            else:
-                st.markdown(
-                    f'<div class="perf-row-off">'
-                    f'<span class="perf-date">{date_str}</span>'
-                    f'<span>{pname}</span>'
-                    f'</div>',
-                    unsafe_allow_html=True,
-                )
-        if checked:
-            selected_perfs.append(pname)
+        checked = _perf_checks[pname]
+        cls = "perf-row-on" if checked else "perf-row-off"
+        icon = "&#9745;" if checked else "&#9744;"
+        icon_color = "#0FFD02" if checked else "#666"
+        _cl_html += (
+            f'<div><div class="{cls}">'
+            f'<span style="color:{icon_color};font-size:15px;">{icon}</span>'
+            f'<span class="perf-date">{date_str}</span>'
+            f'<span>{pname}</span>'
+            f'</div></div>'
+        )
+    _cl_html += '</div>'
+    st.markdown(_cl_html, unsafe_allow_html=True)
+
+    selected_perfs = [p for p, v in _perf_checks.items() if v]
 
     filtered_trend = trend_df[trend_df['공연명'].isin(selected_perfs)].copy()
     filtered_trend['기준일자'] = pd.to_datetime(filtered_trend['기준일자'], errors='coerce')
