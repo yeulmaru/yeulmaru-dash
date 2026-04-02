@@ -38,16 +38,13 @@ else:
     base_date_str = str(base_date)
     base_dt = None
 
-# ── 공연별 집계 ──
+# ── 공연별 최신 스냅샷 (날짜별 누적값이므로 최신 행만 사용) ──
 if '공연명' not in daily_df.columns:
     st.warning("데이터에 '공연명' 컬럼이 없습니다.")
     st.stop()
 
-agg_dict = {'합계좌석': 'sum', '합계금액': 'sum', '오픈석': 'sum'}
-if '공연일(날짜)' in daily_df.columns:
-    agg_dict['공연일(날짜)'] = 'min'
-
-grouped = daily_df.groupby('공연명').agg(agg_dict).reset_index()
+daily_df['_sort_key'] = pd.to_numeric(daily_df['No'], errors='coerce')
+grouped = daily_df.sort_values('_sort_key').groupby('공연명').last().reset_index()
 grouped['점유율'] = (
     grouped['합계좌석'] / grouped['오픈석'].replace(0, float('nan')) * 100
 ).fillna(0).clip(upper=100.0)
