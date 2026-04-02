@@ -15,6 +15,7 @@ check_password()
 
 st.markdown('''
 <style>
+.block-container { padding-top: 0.2rem !important; }
 [data-testid="stDataFrame"] tbody tr:nth-child(even) {
     background-color: rgba(255,255,255,0.06) !important;
 }
@@ -25,6 +26,7 @@ st.markdown('''
 ''', unsafe_allow_html=True)
 
 st.title("📊 실시간 판매현황")
+st.markdown('<div style="margin-bottom:40px;"></div>', unsafe_allow_html=True)
 
 daily_df = load_daily_input()
 trend_df = load_sales_trend()
