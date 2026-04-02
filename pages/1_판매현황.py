@@ -882,6 +882,17 @@ if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in 
             )
         filtered_trend = filtered_trend.dropna(subset=[_y_col]).sort_values('기준일자')
 
+    # ── 공연별 티켓오픈일 맵 (정체 감지용, 30일 경과 판정) ──
+    _ticket_open_map = {}
+    for pname in _default_perfs:
+        _m = _match_master(pname, master_df)
+        if _m is not None and pd.notna(_m.get('티켓오픈일')):
+            _ticket_open_map[pname] = pd.to_datetime(_m['티켓오픈일'], errors='coerce')
+        else:
+            _p_trend = trend_df[trend_df['공연명'] == pname]
+            if not _p_trend.empty:
+                _ticket_open_map[pname] = pd.to_datetime(_p_trend['기준일자'], errors='coerce').min()
+
     # ── 영역4: 차트 ──
     _VIVID_COLORS = ['#FF0000', '#0000FF', '#00FF00', '#FFFF00', '#FF8000', '#8000FF', '#00FFFF']
 
@@ -946,6 +957,37 @@ if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in 
                 x=-0.02, y=1.08, showarrow=False, xanchor='left', yanchor='bottom',
                 font=dict(size=11, color='#AAA'),
             )
+
+            # ── 정체 감지 annotation ──
+            _now = pd.Timestamp.now()
+            for pname in cat_selected:
+                # 30일 미경과 공연은 스킵
+                _open_dt = _ticket_open_map.get(pname)
+                if _open_dt is None or pd.isna(_open_dt) or (_now - _open_dt).days < 30:
+                    continue
+                _pdata = cat_data[cat_data['공연명'] == pname].sort_values('기준일자')
+                if len(_pdata) < 3:
+                    continue
+                _vals = _pdata[_y_col].values
+                _dates = _pdata['기준일자'].values
+                _deltas = np.diff(_vals)
+                _avg_delta = np.mean(_deltas)
+                if _avg_delta <= 0:
+                    continue
+                _threshold = _avg_delta * 0.5
+                # 정체 판정 + 연속 시 첫 번째만 표기
+                _prev_stag = False
+                for j, d in enumerate(_deltas):
+                    is_stag = d <= _threshold
+                    if is_stag and not _prev_stag:
+                        fig.add_annotation(
+                            x=_dates[j + 1], y=float(_vals[j + 1]),
+                            text="정체", showarrow=False,
+                            font=dict(size=9, color='#FF6666'),
+                            yshift=10, xanchor='center',
+                        )
+                    _prev_stag = is_stag
+
             fig = apply_common_layout(fig)
             st.plotly_chart(fig, use_container_width=True)
 
