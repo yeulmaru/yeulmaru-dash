@@ -646,13 +646,13 @@ if not active_df.empty:
     fig = apply_common_layout(fig)
     st.plotly_chart(fig, use_container_width=True)
 
-st.markdown("---")
+st.markdown('<hr style="margin:8px 0;border-color:rgba(255,255,255,0.1);">', unsafe_allow_html=True)
 
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 # 판매추이 (판매중 공연만)
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in trend_df.columns:
-    st.subheader("📈 판매추이")
+    st.markdown('<div style="font-size:20px;font-weight:600;margin-bottom:4px;">📈 판매추이</div>', unsafe_allow_html=True)
 
     # ── 판매중 공연 목록 결정 ──
     # 1차: 공연마스터에 '상태' 컬럼이 있으면 '판매중'인 공연
@@ -721,11 +721,9 @@ if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in 
     }
 
     def _get_category(perf_name):
-        # 1차: 공연마스터 사업구분 컬럼
         matched_m = _match_master(perf_name, master_df)
         if matched_m is not None and pd.notna(matched_m.get('사업구분')):
             return str(matched_m['사업구분']).strip()
-        # 2차: 키워드 fallback
         for key, cat in _CATEGORY_FALLBACK.items():
             if key in str(perf_name):
                 return cat
@@ -740,27 +738,12 @@ if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in 
     _commercial = [p for p in _default_perfs if _get_category(p) == '상업성']
     _public = [p for p in _default_perfs if _get_category(p) == '공공성']
 
-    # 체크리스트 CSS
+    # ── 체크리스트 CSS ──
     st.markdown("""
     <style>
-    .perf-cl-wrap {
-        border: 1px solid rgba(255,255,255,0.15);
-        border-radius: 4px;
-        overflow: hidden;
-    }
-    .perf-cl-wrap [data-testid="stHorizontalBlock"] {
-        gap: 0 !important;
-        border-bottom: 1px solid rgba(255,255,255,0.1);
-        align-items: center;
-    }
-    .perf-cl-wrap [data-testid="stHorizontalBlock"]:last-child { border-bottom: none; }
-    .perf-cl-wrap .stCheckbox { margin: 0 !important; }
-    .perf-cl-wrap .stCheckbox > label {
-        padding: 2px 0 !important;
-        display: flex;
-        align-items: center;
-    }
-    .perf-cl-even { background: rgba(255,255,255,0.03); }
+    .perf-cl-container .stCheckbox { margin: 0 !important; }
+    .perf-cl-container .stCheckbox > label { padding: 1px 0 !important; display: flex; align-items: center; }
+    .perf-cl-container [data-testid="stVerticalBlockBorderWrapper"] { padding: 0 !important; }
     </style>
     """, unsafe_allow_html=True)
 
@@ -768,29 +751,28 @@ if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in 
 
     def _render_checklist(container, title, perf_names):
         with container:
-            st.markdown(
-                f'<div style="font-size:14px;font-weight:600;color:#AAA;margin-bottom:4px;">{title}</div>',
-                unsafe_allow_html=True,
-            )
-            st.markdown('<div class="perf-cl-wrap">', unsafe_allow_html=True)
-            for i, pname in enumerate(perf_names):
-                date_str = perf_date_map.get(pname, '')
-                bg_cls = ' class="perf-cl-even"' if i % 2 == 1 else ''
+            st.markdown(f'<div style="font-size:13px;font-weight:600;color:#AAA;margin:0 0 2px 0;">{title}</div>', unsafe_allow_html=True)
+            _cont = st.container()
+            with _cont:
+                for i, pname in enumerate(perf_names):
+                    date_str = perf_date_map.get(pname, '')
+                    checked = st.session_state.get(f"_trend_cb_{pname}", True)
+                    if checked:
+                        bg = "rgba(15,253,2,0.10)"
+                    elif i % 2 == 1:
+                        bg = "rgba(255,255,255,0.03)"
+                    else:
+                        bg = "transparent"
+                    border = "border-bottom:1px solid rgba(255,255,255,0.08);" if i < len(perf_names) - 1 else ""
+                    text_c = "#FFF"
 
-                col_cb, col_date, col_name = st.columns([0.06, 0.30, 0.64])
-                with col_cb:
-                    st.checkbox(" ", key=f"_trend_cb_{pname}", label_visibility="collapsed")
-                with col_date:
-                    st.markdown(
-                        f'<div style="color:#FFF;font-size:13px;padding:4px 4px;">{date_str}</div>',
-                        unsafe_allow_html=True,
-                    )
-                with col_name:
-                    st.markdown(
-                        f'<div style="color:#FFF;font-size:13px;padding:4px 4px;">{pname}</div>',
-                        unsafe_allow_html=True,
-                    )
-            st.markdown('</div>', unsafe_allow_html=True)
+                    col_cb, col_date, col_name = st.columns([0.05, 0.28, 0.67])
+                    with col_cb:
+                        st.checkbox(" ", key=f"_trend_cb_{pname}", label_visibility="collapsed")
+                    with col_date:
+                        st.markdown(f'<div style="color:{text_c};font-size:13px;padding:2px 0;">{date_str}</div>', unsafe_allow_html=True)
+                    with col_name:
+                        st.markdown(f'<div style="color:{text_c};font-size:13px;padding:2px 0;">{pname}</div>', unsafe_allow_html=True)
 
     _render_checklist(_tbl_left, "상업성", _commercial)
     _render_checklist(_tbl_right, "공공성", _public)
