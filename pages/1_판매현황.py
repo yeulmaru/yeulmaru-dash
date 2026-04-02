@@ -714,56 +714,41 @@ if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in 
     perf_list = trend_df['공연명'].unique().tolist()
     _default_perfs = [p for p in _active_perf_names if p in perf_list] or perf_list
 
-    # ── 공연 체크리스트 (단일 session_state — 위젯 key 직접 사용) ──
-    # 초기값 설정 (첫 로드 시만)
+    # ── 공연 체크리스트 (테이블 내 체크박스만, 위쪽 별도 체크박스 없음) ──
     for p in _default_perfs:
         _cbk = f"_trend_cb_{p}"
         if _cbk not in st.session_state:
             st.session_state[_cbk] = True
 
+    # CSS: 체크리스트 행 컴팩트화 + 체크 상태별 스타일
     st.markdown("""
     <style>
-    .perf-checklist {
-        border: 1px solid rgba(255,255,255,0.15);
-        border-radius: 4px;
-        overflow: hidden;
-    }
-    .perf-cl-row {
-        padding: 4px 10px;
-        font-size: 13px;
-        display: flex;
-        align-items: center;
-        gap: 12px;
-        border-bottom: 1px solid rgba(255,255,255,0.1);
-    }
-    .perf-cl-row.on { background: rgba(0,255,2,0.08); color: #0FFD02; }
-    .perf-cl-row.off { background: rgba(255,255,255,0.02); color: #666; }
-    .perf-checklist > div:last-child .perf-cl-row { border-bottom: none; }
-    .perf-date { min-width: 140px; }
+    .perf-cl-wrap { border: 1px solid rgba(255,255,255,0.15); border-radius: 4px; overflow: hidden; }
+    .perf-cl-wrap [data-testid="stHorizontalBlock"] { gap: 0 !important; border-bottom: 1px solid rgba(255,255,255,0.1); }
+    .perf-cl-wrap [data-testid="stHorizontalBlock"]:last-child { border-bottom: none; }
+    .perf-cl-wrap [data-testid="stVerticalBlockBorderWrapper"] { padding: 0 !important; }
+    .perf-cl-wrap .stCheckbox { margin: 0 !important; }
+    .perf-cl-wrap .stCheckbox > label { padding: 2px 0 !important; }
     </style>
     """, unsafe_allow_html=True)
 
-    # 체크박스 렌더 + 상태 수집 (한 번만)
-    for pname in _default_perfs:
-        st.checkbox(pname, key=f"_trend_cb_{pname}", label_visibility="collapsed")
+    _checklist_container = st.container()
+    with _checklist_container:
+        st.markdown('<div class="perf-cl-wrap">', unsafe_allow_html=True)
+        for pname in _default_perfs:
+            date_str = perf_date_map.get(pname, '')
+            checked = st.session_state.get(f"_trend_cb_{pname}", True)
+            text_color = "#0FFD02" if checked else "#666"
+            bg = "rgba(0,255,2,0.08)" if checked else "rgba(255,255,255,0.02)"
 
-    # HTML 시각 렌더링 (체크 상태 반영)
-    _cl_html = '<div class="perf-checklist">'
-    for pname in _default_perfs:
-        date_str = perf_date_map.get(pname, '')
-        checked = st.session_state.get(f"_trend_cb_{pname}", True)
-        cls = "on" if checked else "off"
-        icon = "&#9745;" if checked else "&#9744;"
-        icon_c = "#0FFD02" if checked else "#666"
-        _cl_html += (
-            f'<div><div class="perf-cl-row {cls}">'
-            f'<span style="color:{icon_c};font-size:15px;">{icon}</span>'
-            f'<span class="perf-date">{date_str}</span>'
-            f'<span>{pname}</span>'
-            f'</div></div>'
-        )
-    _cl_html += '</div>'
-    st.markdown(_cl_html, unsafe_allow_html=True)
+            col_cb, col_date, col_name = st.columns([0.05, 0.25, 0.70])
+            with col_cb:
+                st.checkbox(" ", key=f"_trend_cb_{pname}", label_visibility="collapsed")
+            with col_date:
+                st.markdown(f'<div style="color:{text_color};font-size:13px;padding:4px 0;">{date_str}</div>', unsafe_allow_html=True)
+            with col_name:
+                st.markdown(f'<div style="color:{text_color};font-size:13px;padding:4px 0;">{pname}</div>', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
 
     selected_perfs = [p for p in _default_perfs if st.session_state.get(f"_trend_cb_{p}", True)]
 
@@ -798,21 +783,25 @@ if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in 
 
     # ── Y축 동적 스케일링 함수 ──
     def _snap_ymax_pct(max_val):
-        """점유율(%) 전용 스냅"""
+        """점유율(%) 전용 스냅 — 촘촘한 단계"""
+        if max_val <= 5: return 8
         if max_val <= 10: return 15
-        if max_val <= 25: return 30
+        if max_val <= 20: return 25
+        if max_val <= 30: return 35
+        if max_val <= 40: return 50
         if max_val <= 50: return 60
         if max_val <= 75: return 85
         return 100
 
     def _snap_ymax_general(max_val):
-        """합계좌석/합계금액 등 일반 수치용 스냅 (1.2배 + nice number)"""
+        """합계좌석/합계금액 등 일반 수치용 — max 대비 15~20% 여유"""
         if max_val <= 0:
             return 100
-        ceil = max_val * 1.3
         import math
+        ceil = max_val * 1.18
         mag = 10 ** math.floor(math.log10(ceil))
-        nice = math.ceil(ceil / mag) * mag
+        step = mag / 2  # 반단위 스냅 (50, 500, 5000 등)
+        nice = math.ceil(ceil / step) * step
         return nice
 
     if _y_col in filtered_trend.columns and not filtered_trend.empty:
