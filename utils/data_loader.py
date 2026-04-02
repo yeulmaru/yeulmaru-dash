@@ -88,12 +88,22 @@ def download_excel_from_sharepoint():
         return None
 
 
+_data_source = "unknown"  # 디버그용: 마지막 데이터 소스 추적
+
+
+def get_data_source():
+    """현재 데이터 소스 반환 (디버그용)"""
+    return _data_source
+
+
 def get_excel_data():
     """SharePoint 우선, 실패 시 로컬 data/ 폴더에서 읽기 (fallback)"""
+    global _data_source
     # SharePoint 시도
     try:
         raw = download_excel_from_sharepoint()
         if raw:
+            _data_source = "SharePoint"
             return io.BytesIO(raw)  # 매번 새 BytesIO 생성 → 파일포인터 항상 0
     except:
         pass
@@ -103,7 +113,9 @@ def get_excel_data():
     if os.path.exists(data_dir):
         excel_files = glob.glob(os.path.join(data_dir, "*.xlsx"))
         if excel_files:
+            _data_source = f"로컬({os.path.basename(excel_files[0])})"
             return excel_files[0]
+    _data_source = "없음"
     return None
 
 

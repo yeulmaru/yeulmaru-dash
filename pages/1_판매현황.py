@@ -4,7 +4,7 @@ import plotly.graph_objects as go
 import plotly.express as px
 from datetime import datetime
 
-from utils.data_loader import load_daily_input, load_sales_trend, get_base_date, load_performance_master, load_round_details
+from utils.data_loader import load_daily_input, load_sales_trend, get_base_date, load_performance_master, load_round_details, get_data_source
 from utils.charts import COLORS, apply_common_layout
 
 st.set_page_config(page_title="실시간 판매현황", page_icon="📊", layout="wide")
@@ -181,6 +181,7 @@ with st.sidebar.expander("디버그: 공연마스터 매칭"):
 
 # ── 디버그: Raw 데이터 확인 ──
 with st.sidebar.expander("디버그: Raw 데이터"):
+    st.write(f"**데이터 소스:** `{get_data_source()}`")
     st.write(f"**갱신일자 (base_date):** `{repr(base_date)}` (누적기록 max 기준일자)")
     st.write(f"**daily_df:** {daily_df.shape[0]}행 × {daily_df.shape[1]}열")
     st.write(f"**trend_df:** {trend_df.shape[0] if trend_df is not None else 'None'}행")
@@ -340,8 +341,8 @@ def build_html_table(df, is_active=True):
             if '공연일(날짜)' in r.index and pd.notna(r['공연일(날짜)']):
                 dt_str = pd.to_datetime(r['공연일(날짜)']).strftime('%Y-%m-%d')
             html += f'<td style="padding:8px 12px;">{dt_str}</td>'
-        # 판매좌석
-        html += f'<td style="padding:8px 12px;text-align:right;color:{ACCENT};font-weight:600;">{seats:,}석</td>'
+        # 판매좌석 (흰색)
+        html += f'<td style="padding:8px 12px;text-align:right;color:#FFFFFF;font-weight:600;">{seats:,}석</td>'
         # 전일대비
         html += f'<td style="padding:8px 12px;text-align:right;color:{ACCENT};font-weight:600;">{diff_str}</td>'
         # 오픈석(누적)
