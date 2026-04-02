@@ -16,6 +16,9 @@ check_password()
 
 st.title("📊 실시간 판매현황")
 
+# 캐시 초기화 → SharePoint 최신 데이터 보장
+st.cache_data.clear()
+
 daily_df = load_daily_input()
 trend_df = load_sales_trend()
 base_date = get_base_date()
@@ -59,6 +62,18 @@ else:
         grouped['합계좌석'] / grouped['오픈석'].replace(0, float('nan')) * 100
     ).fillna(0).clip(upper=100.0)
 
+# ── 전일대비 계산 (판매추이 시트에서 최신 2일치 비교) ──
+daily_diff = {}
+if trend_df is not None and not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in trend_df.columns and '합계좌석' in trend_df.columns:
+    for perf_name, grp in trend_df.groupby('공연명'):
+        grp_sorted = grp.dropna(subset=['기준일자', '합계좌석']).sort_values('기준일자')
+        if len(grp_sorted) >= 2:
+            last_two = grp_sorted.tail(2)
+            prev_seats = last_two.iloc[0]['합계좌석']
+            curr_seats = last_two.iloc[1]['합계좌석']
+            diff = int(curr_seats - prev_seats)
+            daily_diff[perf_name] = diff
+
 # ── 판매중 / 종료 분리 ──
 today = pd.Timestamp.now().normalize()
 
@@ -101,12 +116,23 @@ def fmt_money_man(val):
     return f"{int(round(val / 10000)):,}"
 
 
+def fmt_daily_diff(perf_name):
+    """전일대비 좌석 변동 포맷"""
+    diff = daily_diff.get(perf_name)
+    if diff is None:
+        return "-"
+    if diff > 0:
+        return f"+{diff}석"
+    elif diff < 0:
+        return f"{diff}석"
+    return "0석"
+
+
 def build_display_df(df, is_active=True):
     """표시용 DataFrame 생성"""
     rows = []
     for _, r in df.iterrows():
         seats = int(r['합계좌석']) if pd.notna(r['합계좌석']) else 0
-        open_s = int(r['오픈석']) if pd.notna(r['오픈석']) else 0
         money = r['합계금액'] if pd.notna(r['합계금액']) else 0
 
         row = {'공연명': r['공연명']}
@@ -119,11 +145,11 @@ def build_display_df(df, is_active=True):
                 row['공연일'] = ''
 
         row['판매좌석'] = f"{seats:,}"
-        row['오픈석'] = f"{open_s:,}"
 
         col_name = '점유율(%)' if is_active else '최종 점유율(%)'
         row[col_name] = fmt_occupancy(r.get('점유율'))
         row['합계금액(만원)'] = fmt_money_man(money)
+        row['전일대비'] = fmt_daily_diff(r['공연명'])
         rows.append(row)
 
     return pd.DataFrame(rows)
@@ -134,7 +160,7 @@ def build_display_df(df, is_active=True):
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 n_active = len(active_df)
 if not active_df.empty:
-    avg_occ = active_df.loc[active_df['오픈석'] > 0, '점유율'].mean()
+    avg_occ = active_df['점유율'].mean()
     avg_occ = avg_occ if pd.notna(avg_occ) else 0.0
 else:
     avg_occ = 0.0
@@ -155,7 +181,7 @@ if active_df.empty:
     st.info("현재 판매중인 공연이 없습니다.")
 else:
     disp = build_display_df(active_df, is_active=True)
-    right_cols = ['판매좌석', '오픈석', '점유율(%)', '합계금액(만원)']
+    right_cols = ['판매좌석', '점유율(%)', '합계금액(만원)', '전일대비']
     col_config = {
         c: st.column_config.TextColumn(c, width="small") for c in right_cols
     }
@@ -174,7 +200,7 @@ st.markdown("---")
 if not ended_df.empty:
     with st.expander(f"종료된 공연 보기 ({len(ended_df)}건)"):
         disp_ended = build_display_df(ended_df, is_active=False)
-        right_cols_ended = ['판매좌석', '오픈석', '최종 점유율(%)', '합계금액(만원)']
+        right_cols_ended = ['판매좌석', '최종 점유율(%)', '합계금액(만원)', '전일대비']
         col_config_ended = {
             c: st.column_config.TextColumn(c, width="small") for c in right_cols_ended
         }
@@ -202,6 +228,8 @@ if not active_df.empty:
         marker_color=COLORS['primary'],
         text=[f"{v:.1f}%" for v in chart_df['점유율']],
         textposition='auto',
+        customdata=chart_df[['합계좌석', '오픈석']].values,
+        hovertemplate='%{y}<br>점유율: %{x:.1f}%<br>판매좌석: %{customdata[0]:,}<br>오픈석(참고): %{customdata[1]:,}<extra></extra>',
     ))
     fig.add_vline(
         x=100, line_dash="dash", line_color=COLORS['danger'],
