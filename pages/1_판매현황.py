@@ -45,9 +45,19 @@ if '공연명' not in daily_df.columns:
 
 daily_df['_sort_key'] = pd.to_numeric(daily_df['No'], errors='coerce')
 grouped = daily_df.sort_values('_sort_key').groupby('공연명').last().reset_index()
-grouped['점유율'] = (
-    grouped['합계좌석'] / grouped['오픈석'].replace(0, float('nan')) * 100
-).fillna(0).clip(upper=100.0)
+# 점유율: 엑셀 원본값 우선 사용, 없으면 합계좌석/오픈석 fallback
+if '점유율' in grouped.columns:
+    raw = pd.to_numeric(grouped['점유율'], errors='coerce')
+    # 소수(0~1 범위)면 ×100, 이미 %면 그대로
+    raw = raw.where(raw.isna(), raw.apply(lambda v: v * 100 if pd.notna(v) and v <= 1 else v))
+    fallback = (
+        grouped['합계좌석'] / grouped['오픈석'].replace(0, float('nan')) * 100
+    ).clip(upper=100.0)
+    grouped['점유율'] = raw.fillna(fallback).fillna(0)
+else:
+    grouped['점유율'] = (
+        grouped['합계좌석'] / grouped['오픈석'].replace(0, float('nan')) * 100
+    ).fillna(0).clip(upper=100.0)
 
 # ── 판매중 / 종료 분리 ──
 today = pd.Timestamp.now().normalize()
@@ -77,10 +87,11 @@ def fmt_dday(days):
         return f"D+{-d}"
 
 
-def fmt_occupancy(seats, open_s):
-    if pd.isna(open_s) or int(open_s) == 0:
+def fmt_occupancy(occ_pct):
+    """사전 계산된 점유율(%) 값을 포맷"""
+    if pd.isna(occ_pct):
         return "-"
-    return f"{min(seats / open_s * 100, 100.0):.1f}%"
+    return f"{occ_pct:.1f}%"
 
 
 def fmt_money_man(val):
@@ -111,7 +122,7 @@ def build_display_df(df, is_active=True):
         row['오픈석'] = f"{open_s:,}"
 
         col_name = '점유율(%)' if is_active else '최종 점유율(%)'
-        row[col_name] = fmt_occupancy(seats, open_s)
+        row[col_name] = fmt_occupancy(r.get('점유율'))
         row['합계금액(만원)'] = fmt_money_man(money)
         rows.append(row)
 
