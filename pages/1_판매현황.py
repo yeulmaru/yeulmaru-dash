@@ -244,13 +244,13 @@ def fmt_dday(days):
 def fmt_occupancy(occ_pct):
     if pd.isna(occ_pct):
         return "-"
-    return f"{occ_pct:.1f}%"
+    return f"{occ_pct:.1f}"
 
 
 def fmt_money_man(val):
     if pd.isna(val) or val == 0:
-        return "0만원"
-    return f"{int(round(val / 10000)):,}만원"
+        return "0"
+    return f"{int(round(val / 10000)):,}"
 
 
 def fmt_daily_diff(perf_name):
@@ -258,10 +258,10 @@ def fmt_daily_diff(perf_name):
     if diff is None:
         return "-"
     if diff > 0:
-        return f"+{diff}석"
+        return f"+{diff}"
     elif diff < 0:
-        return f"{diff}석"
-    return "0석"
+        return f"{diff}"
+    return "0"
 
 
 def _dday_color(days):
@@ -296,7 +296,7 @@ def _dday_zone(days):
 def build_html_table(df, is_active=True):
     """HTML 테이블 생성"""
     occ_label = '점유율(%)' if is_active else '최종 점유율(%)'
-    headers = ['공연일', '공연명', 'D-day', '판매좌석', '전일대비', '오픈석(누적)', occ_label, '합계금액']
+    headers = ['공연일', '공연명', 'D-day', '판매좌석(석)', '전일대비(석)', '오픈석(석)', occ_label, '판매금액(만원)']
     right_align_cols = {3, 4, 5, 6, 7}
 
     html = '<table style="width:100%;border-collapse:collapse;font-size:14px;">'
@@ -314,7 +314,7 @@ def build_html_table(df, is_active=True):
         base_s = int(r['오픈석']) if pd.notna(r.get('오픈석')) else FALLBACK_SEAT
         rounds = int(r['_회차수']) if pd.notna(r.get('_회차수')) else 1
         total_open_seats = base_s * rounds
-        open_str = f"{total_open_seats:,}석"
+        open_str = f"{total_open_seats:,}"
         money = r['합계금액'] if pd.notna(r['합계금액']) else 0
         occ = fmt_occupancy(r.get('점유율'))
         diff_str = fmt_daily_diff(r['공연명'])
@@ -342,7 +342,7 @@ def build_html_table(df, is_active=True):
                 dt_str = pd.to_datetime(r['공연일(날짜)']).strftime('%Y-%m-%d')
             html += f'<td style="padding:8px 12px;">{dt_str}</td>'
         # 판매좌석 (흰색)
-        html += f'<td style="padding:8px 12px;text-align:right;color:#FFFFFF;font-weight:600;">{seats:,}석</td>'
+        html += f'<td style="padding:8px 12px;text-align:right;color:#FFFFFF;font-weight:600;">{seats:,}</td>'
         # 전일대비
         html += f'<td style="padding:8px 12px;text-align:right;color:{ACCENT};font-weight:600;">{diff_str}</td>'
         # 오픈석(누적)
