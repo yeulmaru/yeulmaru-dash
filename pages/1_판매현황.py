@@ -412,6 +412,26 @@ st.markdown("---")
 if not active_df.empty:
     st.subheader("📊 공연별 점유율 비교")
 
+    # 범례 (HTML, 2그룹 좌우 분리)
+    leg_l, leg_r = st.columns(2)
+    leg_l.markdown(
+        '<div style="font-size:11px;color:#AAA;">'
+        '<span style="color:#FF4B4B">■</span> ~25% &nbsp;&nbsp;'
+        '<span style="color:#FF8C00">■</span> 25~50% &nbsp;&nbsp;'
+        '<span style="color:#FFD700">■</span> 50~75% &nbsp;&nbsp;'
+        '<span style="color:#FFFFFF">■</span> 75%↑'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+    leg_r.markdown(
+        '<div style="font-size:11px;color:#AAA;text-align:right;">'
+        '<span style="color:#FFD700">┊</span> 공연별 목표 &nbsp;&nbsp;'
+        '<span style="color:#FF4B4B">┊</span> 100% &nbsp;&nbsp;'
+        '<span style="color:#555">─</span> D-28'
+        '</div>',
+        unsafe_allow_html=True,
+    )
+
     # D-day 임박순: 작은 D-day가 위 → Plotly는 아래부터 그리므로 ascending=False
     chart_df = active_df.sort_values('_days', ascending=False).copy()
 
@@ -495,6 +515,7 @@ if not active_df.empty:
         width=0.3,
         marker=dict(color=colors),
         text=[''] * len(chart_df),
+        showlegend=False,
         cliponaxis=False,
         customdata=list(zip(
             chart_df['_days'].fillna(0).astype(int),
@@ -603,40 +624,11 @@ if not active_df.empty:
             lines += f'<br><span style="color:{dday_color};font-weight:bold">{dday_str}</span>'
         y_tick_texts.append(lines)
 
-    # 범례 (dummy trace로 Plotly 네이티브 legend 사용)
-    for lbl, clr in [('75%↑', '#FFFFFF'), ('50~75%', '#FFD700'), ('25~50%', '#FF8C00'), ('~25%', '#FF4B4B')]:
-        fig.add_trace(go.Scatter(
-            x=[None], y=[None], mode='markers',
-            marker=dict(size=10, symbol='square', color=clr),
-            name=lbl, showlegend=True,
-        ))
-    fig.add_trace(go.Scatter(
-        x=[None], y=[None], mode='lines',
-        line=dict(color='#FFD700', width=2, dash='dot'),
-        name='공연별 목표', showlegend=True,
-    ))
-    fig.add_trace(go.Scatter(
-        x=[None], y=[None], mode='lines',
-        line=dict(color='#FF4B4B', width=2, dash='dash'),
-        name='100%', showlegend=True,
-    ))
-    fig.add_trace(go.Scatter(
-        x=[None], y=[None], mode='markers',
-        marker=dict(size=10, symbol='line-ew', color='#555', line=dict(width=2, color='#555')),
-        name='D-28', showlegend=True,
-    ))
-
     fig.update_layout(
         xaxis_title="", yaxis_title="",
         height=600,
-        margin=dict(t=120, l=60),
-        showlegend=True,
-        legend=dict(
-            orientation='h', x=0.5, y=1.12,
-            xanchor='center', yanchor='bottom',
-            bgcolor='rgba(0,0,0,0.5)', bordercolor='#333', borderwidth=1,
-            font=dict(size=11, color='#AAA'),
-        ),
+        margin=dict(t=60, l=60),
+        showlegend=False,
         xaxis=dict(
             tickvals=all_ticks, ticktext=tick_texts,
             showgrid=True, gridcolor="rgba(255,255,255,0.08)", gridwidth=1,
