@@ -144,7 +144,9 @@ def build_display_df(df, is_active=True):
             else:
                 row['공연일'] = ''
 
+        open_s = int(r['오픈석']) if pd.notna(r['오픈석']) else 0
         row['판매좌석'] = f"{seats:,}"
+        row['오픈석'] = f"{open_s:,}"
 
         col_name = '점유율(%)' if is_active else '최종 점유율(%)'
         row[col_name] = fmt_occupancy(r.get('점유율'))
@@ -181,7 +183,7 @@ if active_df.empty:
     st.info("현재 판매중인 공연이 없습니다.")
 else:
     disp = build_display_df(active_df, is_active=True)
-    right_cols = ['판매좌석', '점유율(%)', '합계금액(만원)', '전일대비']
+    right_cols = ['판매좌석', '오픈석', '점유율(%)', '합계금액(만원)', '전일대비']
     col_config = {
         c: st.column_config.TextColumn(c, width="small") for c in right_cols
     }
@@ -200,7 +202,7 @@ st.markdown("---")
 if not ended_df.empty:
     with st.expander(f"종료된 공연 보기 ({len(ended_df)}건)"):
         disp_ended = build_display_df(ended_df, is_active=False)
-        right_cols_ended = ['판매좌석', '최종 점유율(%)', '합계금액(만원)', '전일대비']
+        right_cols_ended = ['판매좌석', '오픈석', '최종 점유율(%)', '합계금액(만원)', '전일대비']
         col_config_ended = {
             c: st.column_config.TextColumn(c, width="small") for c in right_cols_ended
         }
