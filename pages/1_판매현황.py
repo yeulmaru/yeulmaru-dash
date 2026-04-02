@@ -959,10 +959,12 @@ if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in 
                 for j, d in enumerate(_deltas):
                     is_stag = d <= _threshold
                     if is_stag and not _prev_stag:
+                        _line_color = color_map.get(pname, '#FF6666')
                         fig.add_annotation(
                             x=_dates[j + 1], y=float(_vals[j + 1]),
                             text="정체", showarrow=False,
-                            font=dict(size=9, color='#FF6666'),
+                            font=dict(size=9, color=_line_color),
+                            bgcolor='rgba(0,0,0,0.85)', borderpad=2,
                             yshift=10, xanchor='center',
                         )
                     _prev_stag = is_stag
