@@ -311,10 +311,10 @@ def build_html_table(df, is_active=True):
     right_align_cols = {3, 4, 5, 6, 7}
 
     html = '<table style="width:100%;border-collapse:collapse;font-size:14px;">'
-    html += '<tr>'
+    html += '<tr style="background-color:rgba(255,255,255,0.08);">'
     for i, h in enumerate(headers):
         align = 'right' if i in right_align_cols else 'left'
-        html += f'<th style="text-align:{align};padding:8px 12px;border-bottom:2px solid #444;color:#AAA;font-weight:600;">{h}</th>'
+        html += f'<th style="text-align:{align};padding:8px 12px;border-bottom:2px solid #444;color:#AAA;font-weight:bold;">{h}</th>'
     html += '</tr>'
 
     prev_zone = None
@@ -378,15 +378,49 @@ if not active_df.empty:
 else:
     avg_occ = 0.0
 
-col1, col2, col3 = st.columns(3)
+# 상업성/공공성 평균 점유율 계산
+_METRIC_CAT = {
+    '브런치콘서트': '상업성', '100층짜리': '상업성', '100층': '상업성',
+    '실내악': '공공성', '무지쿰': '공공성', '편한 음악': '공공성',
+    '편한음악': '공공성', '국립심포니': '공공성', '페스티발앙상블': '공공성',
+}
+
+def _perf_category(pname):
+    for key, cat in _METRIC_CAT.items():
+        if key in str(pname):
+            return cat
+    return None
+
+_comm_occ, _pub_occ = [], []
+for _, r in active_df.iterrows():
+    cat = _perf_category(r['공연명'])
+    if cat == '상업성':
+        _comm_occ.append(r['점유율'])
+    elif cat == '공공성':
+        _pub_occ.append(r['점유율'])
+
+avg_comm = sum(_comm_occ) / len(_comm_occ) if _comm_occ else 0.0
+avg_pub = sum(_pub_occ) / len(_pub_occ) if _pub_occ else 0.0
+
+col1, col2, col3, col4, col5 = st.columns([1.2, 1.5, 1.2, 1.2, 2.5])
 col1.metric("판매중 공연", f"{n_active}개")
 col2.markdown(
-    f'<div style="font-size:14px;color:#AAA;">평균 점유율</div>'
+    f'<div style="font-size:14px;color:#AAA;">평균 객석 점유율</div>'
     f'<div style="font-size:32px;font-weight:700;color:{ACCENT};">{avg_occ:.1f}%</div>',
     unsafe_allow_html=True,
 )
-renew_color = '#FF8C00' if dates_differ else '#FFFFFF'
 col3.markdown(
+    f'<div style="font-size:14px;color:#AAA;">상업성</div>'
+    f'<div style="font-size:28px;font-weight:700;color:#FFD700;">{avg_comm:.1f}%</div>',
+    unsafe_allow_html=True,
+)
+col4.markdown(
+    f'<div style="font-size:14px;color:#AAA;">공공성</div>'
+    f'<div style="font-size:28px;font-weight:700;color:#FFD700;">{avg_pub:.1f}%</div>',
+    unsafe_allow_html=True,
+)
+renew_color = '#FF8C00' if dates_differ else '#0FFD02'
+col5.markdown(
     f'<div style="font-size:14px;color:#AAA;">오늘</div>'
     f'<div style="font-size:20px;font-weight:600;">{today_str}</div>'
     f'<div style="font-size:14px;color:#AAA;margin-top:4px;">갱신일자</div>'
