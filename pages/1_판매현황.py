@@ -704,27 +704,31 @@ if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in 
     if _x_max is None and not active_df.empty and '공연일(날짜)' in active_df.columns:
         _x_max = active_df['공연일(날짜)'].max()
 
-    # ── 영역2: 공통 컨트롤 (박스) ──
-    st.markdown(
-        '<div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);'
-        'border-radius:8px;padding:12px 16px;margin-bottom:12px;">',
-        unsafe_allow_html=True,
-    )
+    # ── 영역2: 공통 컨트롤 ──
     _ctrl1, _ctrl2 = st.columns(2)
     with _ctrl1:
         trend_metric = st.radio("지표 선택", ['점유율(%)', '합계좌석', '합계금액'], horizontal=True)
     with _ctrl2:
         trend_resample = st.radio("기간 단위", ['일별', '주별', '월별'], index=1, horizontal=True)
-    st.markdown('</div>', unsafe_allow_html=True)
 
     perf_list = trend_df['공연명'].unique().tolist()
     _default_perfs = [p for p in _active_perf_names if p in perf_list] or perf_list
 
-    # ── 공연 카테고리: 공연마스터 사업구분 컬럼 기반 ──
+    # ── 공연 카테고리: 공연마스터 사업구분 → 코드 fallback ──
+    _CATEGORY_FALLBACK = {
+        '브런치콘서트': '상업성',
+        '100층짜리': '상업성',
+    }
+
     def _get_category(perf_name):
+        # 1차: 공연마스터 사업구분 컬럼
         matched_m = _match_master(perf_name, master_df)
         if matched_m is not None and pd.notna(matched_m.get('사업구분')):
             return str(matched_m['사업구분']).strip()
+        # 2차: 키워드 fallback
+        for key, cat in _CATEGORY_FALLBACK.items():
+            if key in str(perf_name):
+                return cat
         return '공공성'
 
     # ── 체크박스 초기화 ──
@@ -735,12 +739,6 @@ if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in 
 
     _commercial = [p for p in _default_perfs if _get_category(p) == '상업성']
     _public = [p for p in _default_perfs if _get_category(p) == '공공성']
-
-    # ── 영역3: 공연 선택 표 ──
-    st.markdown(
-        '<div style="background:rgba(255,255,255,0.02);border-radius:8px;padding:8px 0;margin-bottom:8px;">',
-        unsafe_allow_html=True,
-    )
 
     # 체크리스트 CSS
     st.markdown("""
@@ -796,8 +794,6 @@ if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in 
 
     _render_checklist(_tbl_left, "상업성", _commercial)
     _render_checklist(_tbl_right, "공공성", _public)
-
-    st.markdown('</div>', unsafe_allow_html=True)
 
     selected_perfs = [p for p in _default_perfs if st.session_state.get(f"_trend_cb_{p}", True)]
 
