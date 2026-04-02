@@ -521,10 +521,11 @@ if not active_df.empty:
     fig.add_vline(x=100, line_dash="dash", line_color=COLORS['danger'],
                   annotation_text="100%", annotation_position="top right")
 
-    # 각 공연별 목표점유율 개별 세로선 + annotation
-    seen_targets = set()
+    # 각 공연별 목표점유율 개별 세로선 + annotation (모든 공연에 개별 표시)
+    target_values = set()
     for i, (_, row) in enumerate(chart_df.iterrows()):
         target = row['목표점유율']
+        target_values.add(int(target))
         fig.add_shape(
             type="line",
             x0=target, x1=target,
@@ -532,16 +533,13 @@ if not active_df.empty:
             yref="y",
             line=dict(color="#FFD700", width=2, dash="dot"),
         )
-        # 같은 목표값의 annotation은 첫 번째만 표시
-        if target not in seen_targets:
-            seen_targets.add(target)
-            fig.add_annotation(
-                x=target, y=i, yref="y",
-                text=f"목표 {target:.0f}%",
-                showarrow=False,
-                font=dict(color="#FFFFFF", size=9),
-                yshift=18,
-            )
+        fig.add_annotation(
+            x=target, y=i, yref="y",
+            text=f"{target:.0f}%",
+            showarrow=False,
+            font=dict(color="#FFD700", size=9),
+            yshift=16,
+        )
 
     # D-28 구분선 (우측 끝에 흰색 볼드 텍스트)
     if separator_y is not None:
@@ -556,9 +554,19 @@ if not active_df.empty:
             yshift=12,
         )
 
+    # X축 눈금: 목표값은 노란색, 나머지 흰색
+    base_ticks = [0, 20, 40, 60, 80, 100]
+    all_ticks = sorted(set(base_ticks) | target_values)
+    tick_texts = [
+        f'<span style="color:#FFD700;font-weight:bold">{t}</span>' if t in target_values
+        else f'{t}'
+        for t in all_ticks
+    ]
+
     # Y축 라벨 색상 적용
     fig.update_layout(
         xaxis_title="점유율 (%)", yaxis_title="",
+        xaxis=dict(tickvals=all_ticks, ticktext=tick_texts),
         yaxis=dict(
             ticktext=[f'<span style="color:{c}">{name}</span>' for name, c in zip(y_labels, label_colors)],
             tickvals=y_labels,
