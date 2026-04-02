@@ -591,29 +591,17 @@ if not active_df.empty:
         for t in all_ticks
     ]
 
-    # Y축 라벨: 공연명 + 공연일 (D-day는 별도 annotation)
+    # Y축 라벨: 3줄 (공연명 / 공연일 / D-day)
     y_tick_texts = []
-    for name, date_str, color in zip(y_labels, y_dates, label_colors):
+    for name, date_str, color, days in zip(y_labels, y_dates, label_colors, y_ddays):
+        dday_str = fmt_dday(days) if pd.notna(days) else ''
+        dday_color = _label_color(days)
+        lines = f'<span style="color:{color}">{name}</span>'
         if date_str:
-            y_tick_texts.append(
-                f'<span style="color:{color}">{name}</span><br>'
-                f'<span style="color:#999;font-size:10px">{date_str}</span>'
-            )
-        else:
-            y_tick_texts.append(f'<span style="color:{color}">{name}</span>')
-
-    # D-day 별도 annotation 열 (Y축 왼쪽에 정렬)
-    for i, days in enumerate(y_ddays):
-        if pd.notna(days):
-            dday_str = fmt_dday(days)
-            dday_color = _label_color(days)
-            fig.add_annotation(
-                x=-0.01, y=y_labels[i], xref="paper", yref="y",
-                xanchor="right",
-                text=f'<b>{dday_str}</b>',
-                showarrow=False,
-                font=dict(size=12, color=dday_color),
-            )
+            lines += f'<br><span style="color:#999;font-size:10px">{date_str}</span>'
+        if dday_str:
+            lines += f'<br><span style="color:{dday_color};font-weight:bold">{dday_str}</span>'
+        y_tick_texts.append(lines)
 
     # 범례 (차트 영역 밖 상단, 가로 배치)
     legend_text = (
@@ -636,8 +624,8 @@ if not active_df.empty:
 
     fig.update_layout(
         xaxis_title="", yaxis_title="",
-        height=550,
-        margin=dict(t=100, l=60),
+        height=600,
+        margin=dict(t=120, l=60),
         xaxis=dict(
             tickvals=all_ticks, ticktext=tick_texts,
             showgrid=True, gridcolor="rgba(255,255,255,0.08)", gridwidth=1,
