@@ -755,73 +755,50 @@ if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in 
 
     _LABEL_STYLE = 'font-size:15px;font-weight:bold;color:#0FFD02;margin:0 0 2px 0;'
 
-    # ── data_editor 컴팩트 + 홀짝 행 + 체크박스 강조 + 헤더 볼드 CSS ──
-    st.markdown("""
-    <style>
-    [data-testid="stDataFrame"] [data-testid="glideDataEditor"] {
-        font-size: 13px !important;
-    }
-    [data-testid="stDataFrame"] tbody tr:nth-child(even) {
-        background-color: rgba(255,255,255,0.06) !important;
-    }
-    [data-testid="stDataFrame"] tbody tr:nth-child(odd) {
-        background-color: rgba(255,255,255,0.01) !important;
-    }
-    /* 체크박스 강조색 */
-    [data-testid="stDataFrame"] input[type="checkbox"]:checked {
-        accent-color: #0FFD02 !important;
-    }
-    /* 헤더 볼드 */
-    [data-testid="stDataFrame"] thead th {
-        font-weight: bold !important;
-    }
-    /* 테이블 전폭 – 우측 빈 공간 제거 */
-    [data-testid="stDataFrame"] {
-        width: 100% !important;
-    }
-    [data-testid="stDataFrame"] table {
-        width: 100% !important;
-    }
-    </style>
-    """, unsafe_allow_html=True)
-
-    # ── 공연 선택 표 (st.data_editor 기반) ──
-    def _build_editor_df(perf_names):
-        rows = []
-        for pname in perf_names:
-            date_str = perf_date_map.get(pname, '')
-            rows.append({'선택': True, '공연일': date_str, '공연명': pname})
-        return pd.DataFrame(rows)
-
+    # ── 공연 선택 표 (HTML 테이블 + multiselect) ──
     def _render_checklist(container, title, perf_names, editor_key):
         with container:
             st.markdown(f'<div style="{_LABEL_STYLE}">{title}</div>', unsafe_allow_html=True)
             if not perf_names:
                 st.caption("해당 공연 없음")
-                return pd.DataFrame(columns=['선택', '공연일', '공연명'])
-            df = _build_editor_df(perf_names)
-            edited = st.data_editor(
-                df,
-                column_config={
-                    '선택': st.column_config.CheckboxColumn('', width=50, default=True),
-                    '공연일': st.column_config.TextColumn('공연일', width=120),
-                    '공연명': st.column_config.TextColumn('공연명'),
-                },
-                disabled=['공연일', '공연명'],
-                hide_index=True,
-                use_container_width=True,
+                return []
+
+            selected = st.multiselect(
+                f'{title} 공연 선택',
+                options=perf_names,
+                default=perf_names,
                 key=editor_key,
-                height=35 + len(perf_names) * 35,
+                label_visibility='collapsed',
             )
-            return edited
+
+            html = '<table style="width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed;">'
+            html += ('<colgroup><col style="width:30px"><col style="width:100px"><col></colgroup>'
+                     '<thead><tr style="border-bottom:1px solid rgba(255,255,255,0.15);">'
+                     '<th style="text-align:center;padding:5px 4px;font-weight:bold;"></th>'
+                     '<th style="text-align:left;padding:5px 4px;font-weight:bold;">공연일</th>'
+                     '<th style="text-align:left;padding:5px 4px;font-weight:bold;">공연명</th>'
+                     '</tr></thead><tbody>')
+
+            for i, pname in enumerate(perf_names):
+                date_str = perf_date_map.get(pname, '')
+                bg = 'rgba(255,255,255,0.07)' if i % 2 == 0 else 'transparent'
+                is_sel = pname in selected
+                chk = '✓' if is_sel else ''
+                chk_color = '#0FFD02' if is_sel else '#555'
+                txt_opacity = '1.0' if is_sel else '0.4'
+                html += (f'<tr style="background:{bg};">'
+                         f'<td style="text-align:center;padding:5px 4px;color:{chk_color};font-weight:bold;">{chk}</td>'
+                         f'<td style="padding:5px 4px;opacity:{txt_opacity};">{date_str}</td>'
+                         f'<td style="padding:5px 4px;opacity:{txt_opacity};">{pname}</td>'
+                         f'</tr>')
+
+            html += '</tbody></table>'
+            st.markdown(html, unsafe_allow_html=True)
+            return selected
 
     _tbl_left, _tbl_right = st.columns(2)
-    _ed_commercial = _render_checklist(_tbl_left, "상업성", _commercial, "_trend_ed_commercial")
-    _ed_public = _render_checklist(_tbl_right, "공공성", _public, "_trend_ed_public")
-
-    # 선택된 공연 추출
-    _sel_commercial = _ed_commercial[_ed_commercial['선택'] == True]['공연명'].tolist() if not _ed_commercial.empty else []
-    _sel_public = _ed_public[_ed_public['선택'] == True]['공연명'].tolist() if not _ed_public.empty else []
+    _sel_commercial = _render_checklist(_tbl_left, "상업성", _commercial, "_trend_ed_commercial")
+    _sel_public = _render_checklist(_tbl_right, "공공성", _public, "_trend_ed_public")
     selected_perfs = _sel_commercial + _sel_public
 
     # ── 공통 데이터 준비 ──
@@ -898,6 +875,24 @@ if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in 
             if not _p_trend.empty:
                 _ticket_open_map[pname] = pd.to_datetime(_p_trend['기준일자'], errors='coerce').min()
 
+    # ── 목표 점유율 매핑 ──
+    _TARGET_OCCUPANCY = {
+        '브런치콘서트': 60,
+        '100층짜리': 50,
+        '100층': 50,
+        '실내악': 20,
+        '무지쿰': 20,
+        '편한 음악': 20,
+        '편한음악': 20,
+        '국립심포니': 20,
+    }
+
+    def _get_target_occ(pname):
+        for key, val in _TARGET_OCCUPANCY.items():
+            if key in str(pname):
+                return val
+        return None
+
     # ── 영역4: 차트 ──
     _VIVID_COLORS = ['#FF0000', '#0000FF', '#00FF00', '#FFFF00', '#FF8000', '#8000FF', '#00FFFF']
 
@@ -949,6 +944,25 @@ if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in 
                     _ytick_texts.append(f'<span style="color:#0FFD02;font-weight:bold">{txt}</span>')
                 else:
                     _ytick_texts.append(txt)
+
+            # ── 목표 점유율 점선 (점유율 모드만) ──
+            if _y_col == '점유율(%)':
+                _targets = set()
+                for pname in cat_selected:
+                    t = _get_target_occ(pname)
+                    if t is not None:
+                        _targets.add(t)
+                for tgt in _targets:
+                    fig.add_shape(
+                        type='line', x0=0, x1=1, xref='paper',
+                        y0=tgt, y1=tgt, yref='y',
+                        line=dict(color='#FFD700', dash='dash', width=1),
+                    )
+                    if tgt not in _yticks:
+                        _yticks.append(tgt)
+                        _ytick_texts.append(
+                            f'<span style="color:#FFD700;font-weight:bold">{tgt:.0f}</span>'
+                        )
 
             fig.update_layout(
                 xaxis_title="", yaxis_title="", height=400,
