@@ -755,7 +755,22 @@ if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in 
 
     _LABEL_STYLE = 'font-size:15px;font-weight:bold;color:#0FFD02;margin:0 0 2px 0;'
 
-    # ── 공연 선택 체크리스트 (st.checkbox + HTML 테이블) ──
+    # ── 체크리스트 CSS (행간 축소 + 홀짝 배경 + 강조색) ──
+    st.markdown("""
+    <style>
+    .checklist-row [data-testid="stCheckbox"] {padding:0 !important;}
+    .checklist-row [data-testid="stCheckbox"] label {
+        font-size:13px !important; gap:6px !important;
+        padding:5px 6px !important; margin:0 !important;
+        border-radius:4px;
+    }
+    .checklist-row [data-testid="stCheckbox"] input[type="checkbox"]:checked {
+        accent-color:#0FFD02 !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+    # ── 공연 선택 체크리스트 ──
     def _render_checklist(container, title, perf_names, editor_key):
         with container:
             st.markdown(f'<div style="{_LABEL_STYLE}">{title}</div>', unsafe_allow_html=True)
@@ -763,40 +778,17 @@ if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in 
                 st.caption("해당 공연 없음")
                 return []
 
-            # 체크박스로 선택 상태 수집
-            checks = {}
-            for i, pname in enumerate(perf_names):
-                checks[pname] = st.checkbox(
-                    pname, value=True,
-                    key=f'{editor_key}_{i}',
-                    label_visibility='collapsed',
-                )
-
-            # 선택 상태 반영한 HTML 테이블
-            html = '<table style="width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed;">'
-            html += ('<colgroup><col style="width:30px"><col style="width:100px"><col></colgroup>'
-                     '<thead><tr style="border-bottom:1px solid rgba(255,255,255,0.15);">'
-                     '<th style="text-align:center;padding:5px 4px;font-weight:bold;"></th>'
-                     '<th style="text-align:left;padding:5px 4px;font-weight:bold;">공연일</th>'
-                     '<th style="text-align:left;padding:5px 4px;font-weight:bold;">공연명</th>'
-                     '</tr></thead><tbody>')
-
+            selected = []
             for i, pname in enumerate(perf_names):
                 date_str = perf_date_map.get(pname, '')
+                label = f'{date_str}　{pname}' if date_str else pname
                 bg = 'rgba(255,255,255,0.07)' if i % 2 == 0 else 'transparent'
-                is_sel = checks[pname]
-                chk = '✓' if is_sel else ''
-                chk_color = '#0FFD02' if is_sel else '#555'
-                txt_opacity = '1.0' if is_sel else '0.4'
-                html += (f'<tr style="background:{bg};cursor:default;">'
-                         f'<td style="text-align:center;padding:5px 4px;color:{chk_color};font-weight:bold;">{chk}</td>'
-                         f'<td style="padding:5px 4px;opacity:{txt_opacity};">{date_str}</td>'
-                         f'<td style="padding:5px 4px;opacity:{txt_opacity};">{pname}</td>'
-                         f'</tr>')
-
-            html += '</tbody></table>'
-            st.markdown(html, unsafe_allow_html=True)
-            return [p for p, v in checks.items() if v]
+                st.markdown(f'<div class="checklist-row" style="background:{bg};border-radius:4px;">', unsafe_allow_html=True)
+                checked = st.checkbox(label, value=True, key=f'{editor_key}_{i}')
+                st.markdown('</div>', unsafe_allow_html=True)
+                if checked:
+                    selected.append(pname)
+            return selected
 
     _tbl_left, _tbl_right = st.columns(2)
     _sel_commercial = _render_checklist(_tbl_left, "상업성", _commercial, "_trend_ed_commercial")
