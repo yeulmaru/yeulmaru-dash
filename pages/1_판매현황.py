@@ -415,12 +415,29 @@ if not active_df.empty:
     # D-day 임박순: 작은 D-day가 위 → Plotly는 아래부터 그리므로 ascending=False
     chart_df = active_df.sort_values('_days', ascending=False).copy()
 
-    # 목표점유율 매칭
+    # 목표점유율 매칭 (SharePoint 파일에 컬럼이 없을 수 있으므로 코드 레벨 fallback)
+    _TARGET_FALLBACK = {
+        '브런치콘서트': 60, '실내악 페스티벌': 20, '김영욱': 20,
+        '100층짜리': 50, '한국페스티발앙상블': 20, '국립심포니': 20,
+    }
     chart_df['목표점유율'] = 80.0
     for idx, row in chart_df.iterrows():
-        matched = _match_master(row['공연명'], master_df)
+        name = row['공연명']
+        matched = _match_master(name, master_df)
+        target = None
+        # 1차: 공연마스터에서 읽기
         if matched is not None and pd.notna(matched.get('목표점유율')):
-            chart_df.at[idx, '목표점유율'] = float(matched['목표점유율'])
+            val = float(matched['목표점유율'])
+            if val != 80.0:  # 기본값이 아닌 실제 값
+                target = val
+        # 2차: 기본값(80)이면 코드 레벨 매핑으로 override
+        if target is None:
+            for key, fallback in _TARGET_FALLBACK.items():
+                if key in str(name):
+                    target = float(fallback)
+                    break
+        if target is not None:
+            chart_df.at[idx, '목표점유율'] = target
 
     chart_df['달성률'] = (chart_df['점유율'] / chart_df['목표점유율'].replace(0, 80) * 100).clip(lower=0)
 
