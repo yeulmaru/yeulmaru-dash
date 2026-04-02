@@ -713,7 +713,65 @@ if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in 
 
     perf_list = trend_df['공연명'].unique().tolist()
     _default_perfs = [p for p in _active_perf_names if p in perf_list] or perf_list
-    selected_perfs = st.multiselect("공연 선택", perf_list, default=_default_perfs)
+
+    # ── 커스텀 체크리스트 CSS ──
+    st.markdown("""
+    <style>
+    div[data-testid="stHorizontalBlock"].perf-checklist-row .stCheckbox {margin:0;padding:0;}
+    div[data-testid="stHorizontalBlock"].perf-checklist-row .stCheckbox > label {padding:0 !important;}
+    .perf-row-on {
+        background: rgba(0,20,60,0.8);
+        border-radius: 4px;
+        padding: 4px 10px;
+        margin-bottom: 2px;
+        font-size: 13px;
+        color: #0FFD02;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+    .perf-row-off {
+        background: rgba(255,255,255,0.05);
+        border-radius: 4px;
+        padding: 4px 10px;
+        margin-bottom: 2px;
+        font-size: 13px;
+        color: #666;
+        display: flex;
+        align-items: center;
+        gap: 12px;
+    }
+    .perf-date { min-width: 140px; }
+    </style>
+    """, unsafe_allow_html=True)
+
+    # ── 공연 체크리스트 ──
+    selected_perfs = []
+    for pname in _default_perfs:
+        date_str = perf_date_map.get(pname, '')
+        cb_key = f"_trend_cb_{pname}"
+        col_cb, col_label = st.columns([0.04, 0.96])
+        with col_cb:
+            checked = st.checkbox(" ", value=True, key=cb_key, label_visibility="collapsed")
+        with col_label:
+            if checked:
+                st.markdown(
+                    f'<div class="perf-row-on">'
+                    f'<span class="perf-date">{date_str}</span>'
+                    f'<span>{pname}</span>'
+                    f'</div>',
+                    unsafe_allow_html=True,
+                )
+            else:
+                st.markdown(
+                    f'<div class="perf-row-off">'
+                    f'<span class="perf-date">{date_str}</span>'
+                    f'<span>{pname}</span>'
+                    f'</div>',
+                    unsafe_allow_html=True,
+                )
+        if checked:
+            selected_perfs.append(pname)
 
     filtered_trend = trend_df[trend_df['공연명'].isin(selected_perfs)].copy()
     filtered_trend['기준일자'] = pd.to_datetime(filtered_trend['기준일자'], errors='coerce')
