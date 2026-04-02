@@ -453,9 +453,6 @@ if not active_df.empty:
 
     colors = [_bar_color(a) for a in chart_df['달성률']]
 
-    # D-28 구분: 초과 공연은 opacity 0.4
-    opacities = [1.0 if (pd.notna(d) and d <= 28) else 0.4 for d in chart_df['_days']]
-
     # Y축 라벨 색상 (D-day 기반)
     def _label_color(d):
         if pd.isna(d):
@@ -468,6 +465,7 @@ if not active_df.empty:
         return '#FFFFFF'
 
     y_labels = chart_df['공연명'].tolist()
+    y_dates = [perf_date_map.get(name, '') for name in y_labels]
     label_colors = [_label_color(d) for d in chart_df['_days']]
 
     # D-28 경계 인덱스
@@ -494,7 +492,7 @@ if not active_df.empty:
         y=y_labels,
         orientation='h',
         width=0.3,
-        marker=dict(color=colors, opacity=opacities),
+        marker=dict(color=colors),
         text=[''] * len(chart_df),
         cliponaxis=False,
         customdata=list(zip(
@@ -554,10 +552,13 @@ if not active_df.empty:
             bgcolor='rgba(14,17,23,0.7)', borderpad=1,
         )
 
-    # D-28 구분선 (우측 끝에 흰색 볼드 텍스트)
+    # D-28 구분선 (Y축 라벨부터 차트 끝까지 전체 너비)
     if separator_y is not None:
-        fig.add_hline(
-            y=separator_y, line_dash="solid", line_color="#555", line_width=2,
+        fig.add_shape(
+            type="line",
+            x0=0, x1=1, xref="paper",
+            y0=separator_y, y1=separator_y, yref="y",
+            line=dict(color="#555", width=2),
         )
         fig.add_annotation(
             x=1.0, xref="paper", xanchor="right",
@@ -576,14 +577,21 @@ if not active_df.empty:
         for t in all_ticks
     ]
 
-    # Y축 라벨 색상 적용
+    # Y축 라벨: 공연명 + 공연일 (줄바꿈)
+    y_tick_texts = []
+    for name, date_str, color in zip(y_labels, y_dates, label_colors):
+        if date_str:
+            y_tick_texts.append(
+                f'<span style="color:{color}">{name}</span><br>'
+                f'<span style="color:#999;font-size:10px">{date_str}</span>'
+            )
+        else:
+            y_tick_texts.append(f'<span style="color:{color}">{name}</span>')
+
     fig.update_layout(
         xaxis_title="점유율 (%)", yaxis_title="",
         xaxis=dict(tickvals=all_ticks, ticktext=tick_texts),
-        yaxis=dict(
-            ticktext=[f'<span style="color:{c}">{name}</span>' for name, c in zip(y_labels, label_colors)],
-            tickvals=y_labels,
-        ),
+        yaxis=dict(ticktext=y_tick_texts, tickvals=y_labels),
     )
     fig = apply_common_layout(fig)
     st.plotly_chart(fig, use_container_width=True)
@@ -599,7 +607,7 @@ if not active_df.empty:
       </span>
       <span style="color:#FFD700">┆</span> <span>공연별 목표</span>
       <span style="color:#FF4B4B">┆</span> <span>100%</span>
-      <span style="opacity:0.4">█</span> <span>D-28 이후</span>
+      <span style="color:#555">─</span> <span>D-28 구분</span>
     </div>
     """, unsafe_allow_html=True)
 
