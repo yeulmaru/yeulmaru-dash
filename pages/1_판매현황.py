@@ -704,32 +704,28 @@ if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in 
     if _x_max is None and not active_df.empty and '공연일(날짜)' in active_df.columns:
         _x_max = active_df['공연일(날짜)'].max()
 
-    # ── 컨트롤: 지표 + 일별/주별/월별 토글 ──
+    # ── 영역2: 공통 컨트롤 (박스) ──
+    st.markdown(
+        '<div style="background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.1);'
+        'border-radius:8px;padding:12px 16px;margin-bottom:12px;">',
+        unsafe_allow_html=True,
+    )
     _ctrl1, _ctrl2 = st.columns(2)
     with _ctrl1:
         trend_metric = st.radio("지표 선택", ['점유율(%)', '합계좌석', '합계금액'], horizontal=True)
     with _ctrl2:
         trend_resample = st.radio("기간 단위", ['일별', '주별', '월별'], index=1, horizontal=True)
+    st.markdown('</div>', unsafe_allow_html=True)
 
     perf_list = trend_df['공연명'].unique().tolist()
     _default_perfs = [p for p in _active_perf_names if p in perf_list] or perf_list
 
-    # ── 공연 카테고리 매핑 (상업성 / 공공성) ──
-    _CATEGORY_MAP = {
-        '100층짜리': '상업성',
-        '김영욱': '상업성',
-        '4 Seasons': '상업성',
-        '실내악 페스티벌': '공공성',
-        '브런치콘서트': '공공성',
-        '한국페스티발앙상블': '공공성',
-        '국립심포니': '공공성',
-    }
-
+    # ── 공연 카테고리: 공연마스터 사업구분 컬럼 기반 ──
     def _get_category(perf_name):
-        for key, cat in _CATEGORY_MAP.items():
-            if key in str(perf_name):
-                return cat
-        return '공공성'  # 기본값
+        matched_m = _match_master(perf_name, master_df)
+        if matched_m is not None and pd.notna(matched_m.get('사업구분')):
+            return str(matched_m['사업구분']).strip()
+        return '공공성'
 
     # ── 체크박스 초기화 ──
     for p in _default_perfs:
@@ -737,43 +733,71 @@ if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in 
         if _cbk not in st.session_state:
             st.session_state[_cbk] = True
 
-    # ── 카테고리별 공연 분류 ──
     _commercial = [p for p in _default_perfs if _get_category(p) == '상업성']
     _public = [p for p in _default_perfs if _get_category(p) == '공공성']
 
-    # ── 체크리스트 CSS ──
+    # ── 영역3: 공연 선택 표 ──
+    st.markdown(
+        '<div style="background:rgba(255,255,255,0.02);border-radius:8px;padding:8px 0;margin-bottom:8px;">',
+        unsafe_allow_html=True,
+    )
+
+    # 체크리스트 CSS
     st.markdown("""
     <style>
-    .perf-cl-wrap { border: 1px solid rgba(255,255,255,0.15); border-radius: 4px; overflow: hidden; }
-    .perf-cl-wrap [data-testid="stHorizontalBlock"] { gap: 0 !important; border-bottom: 1px solid rgba(255,255,255,0.1); }
+    .perf-cl-wrap {
+        border: 1px solid rgba(255,255,255,0.15);
+        border-radius: 4px;
+        overflow: hidden;
+    }
+    .perf-cl-wrap [data-testid="stHorizontalBlock"] {
+        gap: 0 !important;
+        border-bottom: 1px solid rgba(255,255,255,0.1);
+        align-items: center;
+    }
     .perf-cl-wrap [data-testid="stHorizontalBlock"]:last-child { border-bottom: none; }
     .perf-cl-wrap .stCheckbox { margin: 0 !important; }
-    .perf-cl-wrap .stCheckbox > label { padding: 2px 0 !important; }
+    .perf-cl-wrap .stCheckbox > label {
+        padding: 2px 0 !important;
+        display: flex;
+        align-items: center;
+    }
+    .perf-cl-even { background: rgba(255,255,255,0.03); }
     </style>
     """, unsafe_allow_html=True)
 
-    # ── 좌우 체크리스트 테이블 ──
     _tbl_left, _tbl_right = st.columns(2)
 
     def _render_checklist(container, title, perf_names):
         with container:
-            st.markdown(f'<div style="font-size:14px;font-weight:600;color:#AAA;margin-bottom:4px;">{title}</div>', unsafe_allow_html=True)
+            st.markdown(
+                f'<div style="font-size:14px;font-weight:600;color:#AAA;margin-bottom:4px;">{title}</div>',
+                unsafe_allow_html=True,
+            )
             st.markdown('<div class="perf-cl-wrap">', unsafe_allow_html=True)
-            for pname in perf_names:
+            for i, pname in enumerate(perf_names):
                 date_str = perf_date_map.get(pname, '')
-                label_text = f"{date_str}  {pname}" if date_str else pname
-                checked = st.session_state.get(f"_trend_cb_{pname}", True)
-                text_color = "#0FFD02" if checked else "#666"
+                bg_cls = ' class="perf-cl-even"' if i % 2 == 1 else ''
 
-                col_cb, col_label = st.columns([0.07, 0.93])
+                col_cb, col_date, col_name = st.columns([0.06, 0.30, 0.64])
                 with col_cb:
                     st.checkbox(" ", key=f"_trend_cb_{pname}", label_visibility="collapsed")
-                with col_label:
-                    st.markdown(f'<div style="color:{text_color};font-size:13px;padding:4px 0;">{label_text}</div>', unsafe_allow_html=True)
+                with col_date:
+                    st.markdown(
+                        f'<div style="color:#FFF;font-size:13px;padding:4px 4px;">{date_str}</div>',
+                        unsafe_allow_html=True,
+                    )
+                with col_name:
+                    st.markdown(
+                        f'<div style="color:#FFF;font-size:13px;padding:4px 4px;">{pname}</div>',
+                        unsafe_allow_html=True,
+                    )
             st.markdown('</div>', unsafe_allow_html=True)
 
     _render_checklist(_tbl_left, "상업성", _commercial)
     _render_checklist(_tbl_right, "공공성", _public)
+
+    st.markdown('</div>', unsafe_allow_html=True)
 
     selected_perfs = [p for p in _default_perfs if st.session_state.get(f"_trend_cb_{p}", True)]
 
@@ -840,19 +864,22 @@ if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in 
             )
         filtered_trend = filtered_trend.dropna(subset=[_y_col]).sort_values('기준일자')
 
-    # ── 원색 차트 색상 팔레트 ──
+    # ── 영역4: 차트 ──
     _VIVID_COLORS = ['#FF0000', '#0000FF', '#00FF00', '#FFFF00', '#FF8000', '#8000FF', '#00FFFF']
 
     def _build_color_map(perf_names):
         return {name: _VIVID_COLORS[i % len(_VIVID_COLORS)] for i, name in enumerate(perf_names)}
 
-    # ── 차트 생성 함수 ──
     def _render_chart(container, title, cat_perfs, color_map):
         cat_selected = [p for p in cat_perfs if p in selected_perfs]
         cat_data = filtered_trend[filtered_trend['공연명'].isin(cat_selected)]
         with container:
+            st.markdown(
+                f'<div style="font-size:14px;font-weight:600;color:#AAA;margin-bottom:4px;">{title}</div>',
+                unsafe_allow_html=True,
+            )
             if cat_data.empty or _y_col not in cat_data.columns:
-                st.caption(f"{title}: 데이터 없음")
+                st.caption("데이터 없음")
                 return
 
             _data_max = cat_data[_y_col].max()
@@ -885,11 +912,6 @@ if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in 
             st.caption(_label)
             st.plotly_chart(fig, use_container_width=True)
 
-    # ── 좌우 차트 렌더링 ──
     _chart_left, _chart_right = st.columns(2)
-
-    _commercial_cmap = _build_color_map(_commercial)
-    _public_cmap = _build_color_map(_public)
-
-    _render_chart(_chart_left, "상업성", _commercial, _commercial_cmap)
-    _render_chart(_chart_right, "공공성", _public, _public_cmap)
+    _render_chart(_chart_left, "상업성", _commercial, _build_color_map(_commercial))
+    _render_chart(_chart_right, "공공성", _public, _build_color_map(_public))
