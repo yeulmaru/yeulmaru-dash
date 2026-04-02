@@ -755,7 +755,7 @@ if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in 
 
     _LABEL_STYLE = 'font-size:15px;font-weight:bold;color:#0FFD02;margin:0 0 2px 0;'
 
-    # ── 공연 선택 표 (HTML 테이블 + multiselect) ──
+    # ── 공연 선택 체크리스트 (st.checkbox + HTML 테이블) ──
     def _render_checklist(container, title, perf_names, editor_key):
         with container:
             st.markdown(f'<div style="{_LABEL_STYLE}">{title}</div>', unsafe_allow_html=True)
@@ -763,14 +763,16 @@ if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in 
                 st.caption("해당 공연 없음")
                 return []
 
-            selected = st.multiselect(
-                f'{title} 공연 선택',
-                options=perf_names,
-                default=perf_names,
-                key=editor_key,
-                label_visibility='collapsed',
-            )
+            # 체크박스로 선택 상태 수집
+            checks = {}
+            for i, pname in enumerate(perf_names):
+                checks[pname] = st.checkbox(
+                    pname, value=True,
+                    key=f'{editor_key}_{i}',
+                    label_visibility='collapsed',
+                )
 
+            # 선택 상태 반영한 HTML 테이블
             html = '<table style="width:100%;border-collapse:collapse;font-size:13px;table-layout:fixed;">'
             html += ('<colgroup><col style="width:30px"><col style="width:100px"><col></colgroup>'
                      '<thead><tr style="border-bottom:1px solid rgba(255,255,255,0.15);">'
@@ -782,11 +784,11 @@ if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in 
             for i, pname in enumerate(perf_names):
                 date_str = perf_date_map.get(pname, '')
                 bg = 'rgba(255,255,255,0.07)' if i % 2 == 0 else 'transparent'
-                is_sel = pname in selected
+                is_sel = checks[pname]
                 chk = '✓' if is_sel else ''
                 chk_color = '#0FFD02' if is_sel else '#555'
                 txt_opacity = '1.0' if is_sel else '0.4'
-                html += (f'<tr style="background:{bg};">'
+                html += (f'<tr style="background:{bg};cursor:default;">'
                          f'<td style="text-align:center;padding:5px 4px;color:{chk_color};font-weight:bold;">{chk}</td>'
                          f'<td style="padding:5px 4px;opacity:{txt_opacity};">{date_str}</td>'
                          f'<td style="padding:5px 4px;opacity:{txt_opacity};">{pname}</td>'
@@ -794,7 +796,7 @@ if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in 
 
             html += '</tbody></table>'
             st.markdown(html, unsafe_allow_html=True)
-            return selected
+            return [p for p, v in checks.items() if v]
 
     _tbl_left, _tbl_right = st.columns(2)
     _sel_commercial = _render_checklist(_tbl_left, "상업성", _commercial, "_trend_ed_commercial")
