@@ -878,28 +878,51 @@ if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in 
             else:
                 _y_upper = _snap_ymax_general(_data_max)
 
+            # Y축 라벨 텍스트 (가로 annotation용)
+            if _y_col == '점유율(%)':
+                _yaxis_label = '점유율(%)'
+            elif _y_col == '합계금액':
+                _yaxis_label = '합계금액(만원)'
+            else:
+                _yaxis_label = '합계좌석(석)'
+
             if _y_col == '점유율(%)':
                 fig = px.line(cat_data, x='기준일자', y='점유율(%)', color='공연명', markers=True,
                               hover_data={'합계좌석': ':,', '_오픈석': ':,'},
                               color_discrete_map=color_map)
-                fig.update_layout(yaxis_title="점유율(%)", yaxis=dict(range=[0, _y_upper]))
+                fig.update_layout(yaxis=dict(range=[0, _y_upper]))
                 fig.for_each_trace(lambda t: t.update(
                     hovertemplate='%{x}<br>점유율: %{y:.1f}%<br>판매: %{customdata[0]:,}석 / 오픈: %{customdata[1]:,}석<extra>%{fullData.name}</extra>'
                 ))
-                _label = f"※ Y축 최대 {_y_upper}% 기준"
             else:
                 fig = px.line(cat_data, x='기준일자', y=_y_col, color='공연명', markers=True,
                               color_discrete_map=color_map)
-                fig.update_layout(yaxis_title=_y_col, yaxis=dict(range=[0, _y_upper]))
-                _label = f"※ Y축 최대 {_y_upper:,.0f} 기준"
+                fig.update_layout(yaxis=dict(range=[0, _y_upper]))
+
+            # Y축 최상단 눈금만 강조색
+            import numpy as np
+            _yticks = list(np.linspace(0, _y_upper, 6))
+            _ytick_texts = []
+            for v in _yticks:
+                txt = f'{v:.0f}' if v == int(v) else f'{v:,.0f}'
+                if v == _y_upper:
+                    _ytick_texts.append(f'<span style="color:#0FFD02;font-weight:bold">{txt}</span>')
+                else:
+                    _ytick_texts.append(txt)
 
             fig.update_layout(
-                xaxis_title="", height=400,
-                margin=dict(t=30, b=30, l=50, r=20),
+                xaxis_title="", yaxis_title="", height=400,
+                margin=dict(t=40, b=30, l=50, r=20),
                 showlegend=False,
+                yaxis=dict(range=[0, _y_upper], tickvals=_yticks, ticktext=_ytick_texts),
+            )
+            # Y축 라벨을 좌측 상단에 가로 배치
+            fig.add_annotation(
+                text=_yaxis_label, xref='paper', yref='paper',
+                x=0, y=1.06, showarrow=False, xanchor='left',
+                font=dict(size=11, color='#AAA'),
             )
             fig = apply_common_layout(fig)
-            st.caption(_label)
             st.plotly_chart(fig, use_container_width=True)
 
             # 커스텀 범례 (차트 아래 별도 영역)
