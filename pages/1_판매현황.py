@@ -526,6 +526,7 @@ if not active_df.empty:
             x=occ + 1, y=y_labels[i], yref="y",
             text=html_text, showarrow=False,
             xanchor='left', font=dict(size=12, color='#FFFFFF'),
+            bgcolor='rgba(14,17,23,0.7)', borderpad=2,
         )
 
     # 100% 기준선
@@ -550,6 +551,7 @@ if not active_df.empty:
             showarrow=False,
             font=dict(color="#FFD700", size=9),
             yshift=16,
+            bgcolor='rgba(14,17,23,0.7)', borderpad=1,
         )
 
     # D-28 구분선 (우측 끝에 흰색 볼드 텍스트)
@@ -585,6 +587,21 @@ if not active_df.empty:
     )
     fig = apply_common_layout(fig)
     st.plotly_chart(fig, use_container_width=True)
+
+    # 범례 (HTML)
+    st.markdown("""
+    <div style="display:flex;flex-wrap:wrap;gap:12px 20px;font-size:11px;color:#AAA;padding:0 4px;">
+      <span>■ 달성률 &nbsp;
+        <span style="color:#0FFD02">● 100%↑</span> &nbsp;
+        <span style="color:#FFD700">● 75~99%</span> &nbsp;
+        <span style="color:#FF8C00">● 50~74%</span> &nbsp;
+        <span style="color:#FF4B4B">● 50%↓</span>
+      </span>
+      <span style="color:#FFD700">┆</span> <span>공연별 목표</span>
+      <span style="color:#FF4B4B">┆</span> <span>100%</span>
+      <span style="opacity:0.4">█</span> <span>D-28 이후</span>
+    </div>
+    """, unsafe_allow_html=True)
 
 st.markdown("---")
 
