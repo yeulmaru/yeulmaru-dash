@@ -155,6 +155,10 @@ def load_performance_master():
         if '가용석' in df.columns:
             df['가용석'] = pd.to_numeric(df['가용석'], errors='coerce')
             df['가용석'] = df['가용석'].fillna(df['기준석'])
+        if '목표점유율' in df.columns:
+            df['목표점유율'] = pd.to_numeric(df['목표점유율'], errors='coerce').fillna(80)
+        else:
+            df['목표점유율'] = 80
         return df
     except Exception as e:
         st.warning(f"`공연마스터` 데이터 로드 오류: {e}")
