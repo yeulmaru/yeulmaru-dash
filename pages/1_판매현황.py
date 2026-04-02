@@ -755,70 +755,42 @@ if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in 
 
     _LABEL_STYLE = 'font-size:15px;font-weight:bold;color:#0FFD02;margin:0 0 2px 0;'
 
-    # ── 공연 선택 체크리스트 (st.container per row — 홀짝 배경 보장) ──
+    # ── 공연 선택 표 (st.data_editor 기반) ──
+    def _build_editor_df(perf_names):
+        rows = []
+        for pname in perf_names:
+            date_str = perf_date_map.get(pname, '')
+            rows.append({'선택': True, '공연일': date_str, '공연명': pname})
+        return pd.DataFrame(rows)
+
     def _render_checklist(container, title, perf_names, editor_key):
         with container:
             st.markdown(f'<div style="{_LABEL_STYLE}">{title}</div>', unsafe_allow_html=True)
             if not perf_names:
                 st.caption("해당 공연 없음")
-                return []
-
-            # ── 행별 배경색 + 공통 스타일 CSS (st-key 기반) ──
-            pfx = f'{editor_key}_r'
-            css = ''
-            for i in range(len(perf_names)):
-                bg = 'rgba(255,255,255,0.07)' if i % 2 == 0 else 'rgba(255,255,255,0.02)'
-                css += f'div[st-key="{pfx}{i}"]{{background:{bg}!important;border-radius:4px;margin-bottom:1px;}}\n'
-            css += (
-                f'div[st-key^="{pfx}"] [data-testid="stCheckbox"] label'
-                f'{{padding:2px 0!important;min-height:0!important;}}\n'
-                f'div[st-key^="{pfx}"] [data-testid="stCheckbox"] input:checked'
-                f'{{accent-color:#0FFD02!important;}}\n'
-                f'div[st-key^="{pfx}"] [data-testid="stVerticalBlock"]'
-                f'{{gap:0!important;}}\n'
-                f'div[st-key^="{pfx}"] .stColumn [data-testid="stVerticalBlock"]'
-                f'{{gap:0!important;}}\n'
+                return pd.DataFrame(columns=['선택', '공연일', '공연명'])
+            df = _build_editor_df(perf_names)
+            edited = st.data_editor(
+                df,
+                column_config={
+                    '선택': st.column_config.CheckboxColumn('', width=50, default=True),
+                    '공연일': st.column_config.TextColumn('공연일', width=120),
+                    '공연명': st.column_config.TextColumn('공연명'),
+                },
+                disabled=['공연일', '공연명'],
+                hide_index=True,
+                use_container_width=True,
+                key=editor_key,
+                height=35 + len(perf_names) * 35,
             )
-            st.markdown(f'<style>{css}</style>', unsafe_allow_html=True)
-
-            # ── 헤더 행 ──
-            st.markdown(
-                '<div style="display:grid;grid-template-columns:28px 100px 1fr;'
-                'font-size:13px;font-weight:bold;padding:5px 8px;'
-                'border-bottom:1px solid rgba(255,255,255,0.15);">'
-                '<span></span><span>공연일</span><span>공연명</span></div>',
-                unsafe_allow_html=True,
-            )
-
-            # ── 데이터 행 ──
-            selected = []
-            for i, pname in enumerate(perf_names):
-                date_str = perf_date_map.get(pname, '')
-                with st.container(key=f'{pfx}{i}'):
-                    c1, c2, c3 = st.columns([0.3, 1.2, 3.5])
-                    with c1:
-                        checked = st.checkbox(
-                            'sel', value=True,
-                            key=f'{editor_key}_{i}',
-                            label_visibility='collapsed',
-                        )
-                    with c2:
-                        st.markdown(
-                            f'<span style="font-size:13px;line-height:2.4;">{date_str}</span>',
-                            unsafe_allow_html=True,
-                        )
-                    with c3:
-                        st.markdown(
-                            f'<span style="font-size:13px;line-height:2.4;">{pname}</span>',
-                            unsafe_allow_html=True,
-                        )
-                if checked:
-                    selected.append(pname)
-            return selected
+            return edited
 
     _tbl_left, _tbl_right = st.columns(2)
-    _sel_commercial = _render_checklist(_tbl_left, "상업성", _commercial, "_trend_ed_commercial")
-    _sel_public = _render_checklist(_tbl_right, "공공성", _public, "_trend_ed_public")
+    _ed_commercial = _render_checklist(_tbl_left, "상업성", _commercial, "_trend_ed_commercial")
+    _ed_public = _render_checklist(_tbl_right, "공공성", _public, "_trend_ed_public")
+
+    _sel_commercial = _ed_commercial[_ed_commercial['선택'] == True]['공연명'].tolist() if not _ed_commercial.empty else []
+    _sel_public = _ed_public[_ed_public['선택'] == True]['공연명'].tolist() if not _ed_public.empty else []
     selected_perfs = _sel_commercial + _sel_public
 
     # ── 공통 데이터 준비 ──
