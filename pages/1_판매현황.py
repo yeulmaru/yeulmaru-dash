@@ -23,7 +23,7 @@ st.markdown('''
 </style>
 ''', unsafe_allow_html=True)
 
-st.title("📊 실시간 판매현황")
+st.title("📊 [1] 실시간 판매현황")
 
 daily_df = load_daily_input()
 trend_df = load_sales_trend()
@@ -458,7 +458,7 @@ st.markdown("---")
 # 섹션 4: 공연별 점유율 비교 차트 (판매중만)
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 if not active_df.empty:
-    st.subheader("📊 공연별 점유율 비교")
+    st.subheader("📊 [2] 공연별 점유율 비교")
 
     # 범례 (HTML, 2그룹 좌우 분리)
     leg_l, leg_r = st.columns(2)
@@ -700,7 +700,7 @@ st.markdown('<hr style="margin:8px 0;border-color:rgba(255,255,255,0.1);">', uns
 # 판매추이 (판매중 공연만)
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in trend_df.columns:
-    st.markdown('<div style="font-size:2rem;font-weight:700;margin:0 0 24px 0;">📈 판매추이</div>', unsafe_allow_html=True)
+    st.markdown('<div style="font-size:2rem;font-weight:700;margin:0 0 24px 0;">📈 [3] 판매추이</div>', unsafe_allow_html=True)
 
     # ── 판매중 공연 목록 결정 ──
     # 1차: 공연마스터에 '상태' 컬럼이 있으면 '판매중'인 공연
@@ -756,10 +756,10 @@ if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in 
     _ctrl1, _ctrl2, _ctrl_spacer = st.columns([2.5, 1.5, 4])
     _LBL = 'font-size:24px;font-weight:bold;color:#0FFD02;margin:0 0 8px 0;'
     with _ctrl1:
-        st.markdown(f'<div style="{_LBL}">[1] 지표 선택</div>', unsafe_allow_html=True)
+        st.markdown(f'<div style="{_LBL}">① 지표 선택</div>', unsafe_allow_html=True)
         trend_metric = st.radio("지표 선택", ['점유율(%)', '합계좌석', '합계금액'], horizontal=True, label_visibility="collapsed")
     with _ctrl2:
-        st.markdown(f'<div style="{_LBL}">[2] 기간 단위</div>', unsafe_allow_html=True)
+        st.markdown(f'<div style="{_LBL}">② 기간 단위</div>', unsafe_allow_html=True)
         trend_resample = st.radio("기간 단위", ['일별', '주별', '월별'], index=1, horizontal=True, label_visibility="collapsed")
 
     perf_list = trend_df['공연명'].unique().tolist()
