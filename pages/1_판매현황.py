@@ -15,7 +15,6 @@ check_password()
 
 st.markdown('''
 <style>
-.block-container { padding-top: 0.2rem !important; }
 [data-testid="stDataFrame"] tbody tr:nth-child(even) {
     background-color: rgba(255,255,255,0.06) !important;
 }
