@@ -895,12 +895,20 @@ if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in 
 
             fig.update_layout(
                 xaxis_title="", height=400,
-                margin=dict(t=30, b=40, l=50, r=20),
-                legend=dict(orientation="h", yanchor="bottom", y=-0.25, xanchor="center", x=0.5),
+                margin=dict(t=30, b=30, l=50, r=20),
+                showlegend=False,
             )
             fig = apply_common_layout(fig)
             st.caption(_label)
             st.plotly_chart(fig, use_container_width=True)
+
+            # 커스텀 범례 (차트 아래 별도 영역)
+            _leg_html = '<div style="display:flex;flex-wrap:wrap;gap:6px 16px;padding:2px 0;">'
+            for pname in cat_selected:
+                c = color_map.get(pname, '#FFF')
+                _leg_html += f'<span style="font-size:12px;color:#CCC;white-space:nowrap;"><span style="color:{c};">●</span> {pname}</span>'
+            _leg_html += '</div>'
+            st.markdown(_leg_html, unsafe_allow_html=True)
 
     _chart_left, _chart_right = st.columns(2)
     _render_chart(_chart_left, "상업성", _commercial, _build_color_map(_commercial))
