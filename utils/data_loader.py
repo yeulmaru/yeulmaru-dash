@@ -24,7 +24,7 @@ def get_access_token():
     return response.json()["access_token"]
 
 
-@st.cache_data(ttl=300)
+@st.cache_data(ttl=60)
 def download_excel_from_sharepoint():
     """SharePoint에서 엑셀 파일 다운로드 → BytesIO 반환"""
     try:
@@ -109,7 +109,7 @@ def get_excel_data():
 
 # ── 하위 호환용 ──
 
-@st.cache_data(ttl=300)
+@st.cache_data(ttl=60)
 def get_data_filepath():
     """하위 호환용 - 로컬 파일 경로 반환"""
     data_dir = "data"
@@ -123,7 +123,7 @@ def get_data_filepath():
 
 # ── 데이터 로드 함수들 ──
 
-@st.cache_data(ttl=300)
+@st.cache_data(ttl=60)
 def get_base_date():
     source = get_excel_data()
     if not source:
@@ -139,7 +139,7 @@ def get_base_date():
         return None
 
 
-@st.cache_data(ttl=300)
+@st.cache_data(ttl=60)
 def load_daily_input():
     source = get_excel_data()
     if not source:
@@ -161,7 +161,7 @@ def load_daily_input():
         return None
 
 
-@st.cache_data(ttl=300)
+@st.cache_data(ttl=60)
 def load_sales_trend():
     source = get_excel_data()
     if not source:
@@ -179,7 +179,7 @@ def load_sales_trend():
         return None
 
 
-@st.cache_data(ttl=300)
+@st.cache_data(ttl=60)
 def load_25_performance():
     source = get_excel_data()
     if not source:
@@ -419,7 +419,7 @@ def write_daily_entries_to_sharepoint(entries):
         return False, f"SharePoint 쓰기 실패: {e}"
 
 
-@st.cache_data(ttl=300)
+@st.cache_data(ttl=60)
 def load_yearly_performance():
     source = get_excel_data()
     if not source:
@@ -433,7 +433,7 @@ def load_yearly_performance():
         return None
 
 
-@st.cache_data(ttl=300)
+@st.cache_data(ttl=60)
 def load_detailed_management():
     source = get_excel_data()
     if not source:

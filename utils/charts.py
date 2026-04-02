@@ -1,7 +1,9 @@
 import plotly.graph_objects as go
 
+ACCENT_COLOR = "#0FFD02"
+
 COLORS = {
-    'primary': '#0FFD02',      # 네온 그린 (강조)
+    'primary': ACCENT_COLOR,    # 네온 그린 (강조)
     'secondary': '#00B2FF',    # 블루
     'danger': '#FF4B4B',       # 빨강 (지출/적자)
     'neutral': '#636EFA',      # 기본

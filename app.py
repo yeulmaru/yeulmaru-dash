@@ -3,6 +3,7 @@ import os
 import sys
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+from utils.charts import ACCENT_COLOR
 
 st.set_page_config(
     page_title="GS칼텍스 예울마루 대시보드",
@@ -47,17 +48,17 @@ try:
 except Exception as e:
     pass
 
-st.markdown("""
+st.markdown(f"""
 <style>
 /* Streamlit 메인 화면 테마에 네온 그린 강조 */
-div.stButton > button:first-child {
+div.stButton > button:first-child {{
     background-color: #0E1117;
-    border-color: #0FFD02;
-    color: #0FFD02;
-}
-div.stButton > button:first-child:hover {
-    background-color: #0FFD02;
+    border-color: {ACCENT_COLOR};
+    color: {ACCENT_COLOR};
+}}
+div.stButton > button:first-child:hover {{
+    background-color: {ACCENT_COLOR};
     color: #0E1117;
-}
+}}
 </style>
 """, unsafe_allow_html=True)
