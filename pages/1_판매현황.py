@@ -411,23 +411,92 @@ st.markdown("---")
 # ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 if not active_df.empty:
     st.subheader("📊 공연별 점유율 비교")
-    chart_df = active_df.sort_values('점유율', ascending=True)
+
+    # D-day 가까운 순 (맨 위 = D-day 가장 작은) → Plotly는 아래부터 그리므로 역순 정렬
+    chart_df = active_df.sort_values('_days', ascending=False).copy()
+
+    # 목표점유율 매칭
+    chart_df['목표점유율'] = 80.0
+    for idx, row in chart_df.iterrows():
+        matched = _match_master(row['공연명'], master_df)
+        if matched is not None and pd.notna(matched.get('목표점유율')):
+            chart_df.at[idx, '목표점유율'] = float(matched['목표점유율'])
+
+    chart_df['달성률'] = (chart_df['점유율'] / chart_df['목표점유율'].replace(0, 80) * 100).clip(lower=0)
+
+    # 막대 색상 — 달성률 기준
+    def _bar_color(achieve):
+        if achieve >= 100:
+            return '#0FFD02'
+        if achieve >= 75:
+            return '#FFD700'
+        if achieve >= 50:
+            return '#FF8C00'
+        return '#FF4B4B'
+
+    colors = [_bar_color(a) for a in chart_df['달성률']]
+
+    # D-28 구분: 초과 공연은 opacity 0.4
+    opacities = [1.0 if (pd.notna(d) and d <= 28) else 0.4 for d in chart_df['_days']]
+
+    # D-28 경계 인덱스 찾기 (Plotly y축 기준)
+    y_labels = chart_df['공연명'].tolist()
+    separator_y = None
+    for i in range(len(chart_df) - 1):
+        d_cur = chart_df.iloc[i]['_days']
+        d_next = chart_df.iloc[i + 1]['_days']
+        if pd.notna(d_cur) and pd.notna(d_next) and d_cur > 28 and d_next <= 28:
+            separator_y = i + 0.5  # Plotly categorical axis 기준
 
     fig = go.Figure()
     fig.add_trace(go.Bar(
         x=chart_df['점유율'],
-        y=chart_df['공연명'],
+        y=y_labels,
         orientation='h',
-        marker_color=COLORS['primary'],
+        marker=dict(color=colors, opacity=opacities),
         text=[f"{v:.1f}%" for v in chart_df['점유율']],
         textposition='auto',
-        customdata=chart_df[['합계좌석', '누적오픈석']].values,
-        hovertemplate='%{y}<br>점유율: %{x:.1f}%<br>판매좌석: %{customdata[0]:,}<br>누적오픈석: %{customdata[1]:,}<extra></extra>',
+        customdata=list(zip(
+            chart_df['_days'].fillna(0).astype(int),
+            chart_df['목표점유율'],
+            chart_df['달성률'].round(1),
+            chart_df['합계좌석'].fillna(0).astype(int),
+            chart_df['누적오픈석'].fillna(0).astype(int),
+        )),
+        hovertemplate=(
+            '%{y}<br>'
+            'D-%{customdata[0]}<br>'
+            '점유율: %{x:.1f}%<br>'
+            '목표: %{customdata[1]:.0f}%<br>'
+            '달성률: %{customdata[2]:.1f}%<br>'
+            '판매: %{customdata[3]:,}석 / 오픈: %{customdata[4]:,}석'
+            '<extra></extra>'
+        ),
     ))
-    fig.add_vline(
-        x=100, line_dash="dash", line_color=COLORS['danger'],
-        annotation_text="100%", annotation_position="top right",
-    )
+
+    # 100% 기준선
+    fig.add_vline(x=100, line_dash="dash", line_color=COLORS['danger'],
+                  annotation_text="100%", annotation_position="top right")
+
+    # 각 공연별 목표점유율 세로선 (개별 shape)
+    for i, (_, row) in enumerate(chart_df.iterrows()):
+        target = row['목표점유율']
+        fig.add_shape(
+            type="line",
+            x0=target, x1=target,
+            y0=i - 0.4, y1=i + 0.4,
+            yref="y",
+            line=dict(color="#FFD700", width=2, dash="dash"),
+        )
+
+    # D-28 구분선
+    if separator_y is not None:
+        fig.add_hline(
+            y=separator_y, line_dash="solid", line_color="#555", line_width=2,
+            annotation_text="D-28", annotation_position="top left",
+            annotation_font_color="#AAA",
+        )
+
     fig.update_layout(xaxis_title="점유율 (%)", yaxis_title="")
     fig = apply_common_layout(fig)
     st.plotly_chart(fig, use_container_width=True)
