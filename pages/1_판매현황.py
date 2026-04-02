@@ -412,7 +412,7 @@ st.markdown("---")
 if not active_df.empty:
     st.subheader("📊 공연별 점유율 비교")
 
-    # D-day 가까운 순 (맨 위 = D-day 가장 작은) → Plotly는 아래부터 그리므로 역순 정렬
+    # D-day 임박순: 작은 D-day가 위 → Plotly는 아래부터 그리므로 ascending=False
     chart_df = active_df.sort_values('_days', ascending=False).copy()
 
     # 목표점유율 매칭
@@ -439,14 +439,37 @@ if not active_df.empty:
     # D-28 구분: 초과 공연은 opacity 0.4
     opacities = [1.0 if (pd.notna(d) and d <= 28) else 0.4 for d in chart_df['_days']]
 
-    # D-28 경계 인덱스 찾기 (Plotly y축 기준)
+    # Y축 라벨 색상 (D-day 기반)
+    def _label_color(d):
+        if pd.isna(d):
+            return '#FFFFFF'
+        d = int(d)
+        if d <= 7:
+            return '#FF8C00'
+        if d <= 14:
+            return '#FFD700'
+        return '#FFFFFF'
+
     y_labels = chart_df['공연명'].tolist()
+    label_colors = [_label_color(d) for d in chart_df['_days']]
+
+    # D-28 경계 인덱스
     separator_y = None
     for i in range(len(chart_df) - 1):
         d_cur = chart_df.iloc[i]['_days']
         d_next = chart_df.iloc[i + 1]['_days']
         if pd.notna(d_cur) and pd.notna(d_next) and d_cur > 28 and d_next <= 28:
-            separator_y = i + 0.5  # Plotly categorical axis 기준
+            separator_y = i + 0.5
+
+    # 막대 텍스트: "28.4% (263/926)"
+    bar_texts = []
+    for _, row in chart_df.iterrows():
+        occ = row['점유율']
+        sold = int(row['합계좌석']) if pd.notna(row['합계좌석']) else 0
+        base_s = int(row['오픈석']) if pd.notna(row.get('오픈석')) else FALLBACK_SEAT
+        rounds = int(row['_회차수']) if pd.notna(row.get('_회차수')) else 1
+        total = base_s * rounds
+        bar_texts.append(f"{occ:.1f}% ({sold:,}/{total:,})")
 
     fig = go.Figure()
     fig.add_trace(go.Bar(
@@ -454,7 +477,7 @@ if not active_df.empty:
         y=y_labels,
         orientation='h',
         marker=dict(color=colors, opacity=opacities),
-        text=[f"{v:.1f}%" for v in chart_df['점유율']],
+        text=bar_texts,
         textposition='auto',
         customdata=list(zip(
             chart_df['_days'].fillna(0).astype(int),
@@ -478,7 +501,7 @@ if not active_df.empty:
     fig.add_vline(x=100, line_dash="dash", line_color=COLORS['danger'],
                   annotation_text="100%", annotation_position="top right")
 
-    # 각 공연별 목표점유율 세로선 (개별 shape)
+    # 각 공연별 목표점유율 개별 세로선
     for i, (_, row) in enumerate(chart_df.iterrows()):
         target = row['목표점유율']
         fig.add_shape(
@@ -489,15 +512,27 @@ if not active_df.empty:
             line=dict(color="#FFD700", width=2, dash="dash"),
         )
 
-    # D-28 구분선
+    # D-28 구분선 (우측 끝에 흰색 볼드 텍스트)
     if separator_y is not None:
         fig.add_hline(
             y=separator_y, line_dash="solid", line_color="#555", line_width=2,
-            annotation_text="D-28", annotation_position="top left",
-            annotation_font_color="#AAA",
+        )
+        fig.add_annotation(
+            x=1.0, xref="paper", xanchor="right",
+            y=separator_y, yref="y",
+            text="<b>D-28</b>", showarrow=False,
+            font=dict(color="#FFFFFF", size=12),
+            yshift=12,
         )
 
-    fig.update_layout(xaxis_title="점유율 (%)", yaxis_title="")
+    # Y축 라벨 색상 적용
+    fig.update_layout(
+        xaxis_title="점유율 (%)", yaxis_title="",
+        yaxis=dict(
+            ticktext=[f'<span style="color:{c}">{name}</span>' for name, c in zip(y_labels, label_colors)],
+            tickvals=y_labels,
+        ),
+    )
     fig = apply_common_layout(fig)
     st.plotly_chart(fig, use_container_width=True)
 
