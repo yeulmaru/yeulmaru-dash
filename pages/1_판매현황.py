@@ -714,55 +714,80 @@ if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in 
     perf_list = trend_df['공연명'].unique().tolist()
     _default_perfs = [p for p in _active_perf_names if p in perf_list] or perf_list
 
-    # ── 공연 체크리스트 (테이블 내 체크박스만, 위쪽 별도 체크박스 없음) ──
+    # ── 공연 카테고리 매핑 (상업성 / 공공성) ──
+    _CATEGORY_MAP = {
+        '100층짜리': '상업성',
+        '김영욱': '상업성',
+        '4 Seasons': '상업성',
+        '실내악 페스티벌': '공공성',
+        '브런치콘서트': '공공성',
+        '한국페스티발앙상블': '공공성',
+        '국립심포니': '공공성',
+    }
+
+    def _get_category(perf_name):
+        for key, cat in _CATEGORY_MAP.items():
+            if key in str(perf_name):
+                return cat
+        return '공공성'  # 기본값
+
+    # ── 체크박스 초기화 ──
     for p in _default_perfs:
         _cbk = f"_trend_cb_{p}"
         if _cbk not in st.session_state:
             st.session_state[_cbk] = True
 
-    # CSS: 체크리스트 행 컴팩트화 + 체크 상태별 스타일
+    # ── 카테고리별 공연 분류 ──
+    _commercial = [p for p in _default_perfs if _get_category(p) == '상업성']
+    _public = [p for p in _default_perfs if _get_category(p) == '공공성']
+
+    # ── 체크리스트 CSS ──
     st.markdown("""
     <style>
     .perf-cl-wrap { border: 1px solid rgba(255,255,255,0.15); border-radius: 4px; overflow: hidden; }
     .perf-cl-wrap [data-testid="stHorizontalBlock"] { gap: 0 !important; border-bottom: 1px solid rgba(255,255,255,0.1); }
     .perf-cl-wrap [data-testid="stHorizontalBlock"]:last-child { border-bottom: none; }
-    .perf-cl-wrap [data-testid="stVerticalBlockBorderWrapper"] { padding: 0 !important; }
     .perf-cl-wrap .stCheckbox { margin: 0 !important; }
     .perf-cl-wrap .stCheckbox > label { padding: 2px 0 !important; }
     </style>
     """, unsafe_allow_html=True)
 
-    _checklist_container = st.container()
-    with _checklist_container:
-        st.markdown('<div class="perf-cl-wrap">', unsafe_allow_html=True)
-        for pname in _default_perfs:
-            date_str = perf_date_map.get(pname, '')
-            checked = st.session_state.get(f"_trend_cb_{pname}", True)
-            text_color = "#0FFD02" if checked else "#666"
-            bg = "rgba(0,255,2,0.08)" if checked else "rgba(255,255,255,0.02)"
+    # ── 좌우 체크리스트 테이블 ──
+    _tbl_left, _tbl_right = st.columns(2)
 
-            col_cb, col_date, col_name = st.columns([0.05, 0.25, 0.70])
-            with col_cb:
-                st.checkbox(" ", key=f"_trend_cb_{pname}", label_visibility="collapsed")
-            with col_date:
-                st.markdown(f'<div style="color:{text_color};font-size:13px;padding:4px 0;">{date_str}</div>', unsafe_allow_html=True)
-            with col_name:
-                st.markdown(f'<div style="color:{text_color};font-size:13px;padding:4px 0;">{pname}</div>', unsafe_allow_html=True)
-        st.markdown('</div>', unsafe_allow_html=True)
+    def _render_checklist(container, title, perf_names):
+        with container:
+            st.markdown(f'<div style="font-size:14px;font-weight:600;color:#AAA;margin-bottom:4px;">{title}</div>', unsafe_allow_html=True)
+            st.markdown('<div class="perf-cl-wrap">', unsafe_allow_html=True)
+            for pname in perf_names:
+                date_str = perf_date_map.get(pname, '')
+                label_text = f"{date_str}  {pname}" if date_str else pname
+                checked = st.session_state.get(f"_trend_cb_{pname}", True)
+                text_color = "#0FFD02" if checked else "#666"
+
+                col_cb, col_label = st.columns([0.07, 0.93])
+                with col_cb:
+                    st.checkbox(" ", key=f"_trend_cb_{pname}", label_visibility="collapsed")
+                with col_label:
+                    st.markdown(f'<div style="color:{text_color};font-size:13px;padding:4px 0;">{label_text}</div>', unsafe_allow_html=True)
+            st.markdown('</div>', unsafe_allow_html=True)
+
+    _render_checklist(_tbl_left, "상업성", _commercial)
+    _render_checklist(_tbl_right, "공공성", _public)
 
     selected_perfs = [p for p in _default_perfs if st.session_state.get(f"_trend_cb_{p}", True)]
 
+    # ── 공통 데이터 준비 ──
     filtered_trend = trend_df[trend_df['공연명'].isin(selected_perfs)].copy()
     filtered_trend['기준일자'] = pd.to_datetime(filtered_trend['기준일자'], errors='coerce')
     filtered_trend = filtered_trend.dropna(subset=['기준일자']).sort_values(by='기준일자')
 
-    # X축 범위 적용
     if _x_min is not None:
         filtered_trend = filtered_trend[filtered_trend['기준일자'] >= _x_min]
     if _x_max is not None:
         filtered_trend = filtered_trend[filtered_trend['기준일자'] <= _x_max]
 
-    # ── 점유율 계산: 공연별 오픈석 매핑 후 파생 컬럼 추가 ──
+    # 점유율 계산
     _open_seat_map = {}
     for pname in selected_perfs:
         matched_m = _match_master(pname, master_df)
@@ -775,7 +800,6 @@ if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in 
         filtered_trend['_오픈석'] = filtered_trend['공연명'].map(_open_seat_map).fillna(FALLBACK_SEAT)
         filtered_trend['점유율(%)'] = (filtered_trend['합계좌석'] / filtered_trend['_오픈석'] * 100).clip(0, 100)
 
-    # ── 리샘플링 (누적값이므로 각 구간의 마지막 값) ──
     _y_col = trend_metric
     _resample_cols = [_y_col]
     if _y_col == '점유율(%)':
@@ -783,7 +807,6 @@ if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in 
 
     # ── Y축 동적 스케일링 함수 ──
     def _snap_ymax_pct(max_val):
-        """점유율(%) 전용 스냅 — 촘촘한 단계"""
         if max_val <= 5: return 8
         if max_val <= 10: return 15
         if max_val <= 20: return 25
@@ -794,16 +817,16 @@ if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in 
         return 100
 
     def _snap_ymax_general(max_val):
-        """합계좌석/합계금액 등 일반 수치용 — max 대비 15~20% 여유"""
         if max_val <= 0:
             return 100
         import math
         ceil = max_val * 1.18
         mag = 10 ** math.floor(math.log10(ceil))
-        step = mag / 2  # 반단위 스냅 (50, 500, 5000 등)
+        step = mag / 2
         nice = math.ceil(ceil / step) * step
         return nice
 
+    # ── 리샘플링 ──
     if _y_col in filtered_trend.columns and not filtered_trend.empty:
         if trend_resample == '주별':
             filtered_trend = (
@@ -817,33 +840,56 @@ if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in 
             )
         filtered_trend = filtered_trend.dropna(subset=[_y_col]).sort_values('기준일자')
 
-        # Y축 상한 계산
-        _data_max = filtered_trend[_y_col].max() if not filtered_trend.empty else 0
-        if _y_col == '점유율(%)':
-            _y_upper = _snap_ymax_pct(_data_max)
-        else:
-            _y_upper = _snap_ymax_general(_data_max)
+    # ── 원색 차트 색상 팔레트 ──
+    _VIVID_COLORS = ['#FF0000', '#0000FF', '#00FF00', '#FFFF00', '#FF8000', '#8000FF', '#00FFFF']
 
-        if _y_col == '점유율(%)':
-            fig2 = px.line(filtered_trend, x='기준일자', y='점유율(%)', color='공연명', markers=True,
-                           hover_data={'합계좌석': ':,', '_오픈석': ':,'})
-            fig2.update_layout(xaxis_title="기준일자", yaxis_title="점유율(%)",
-                               yaxis=dict(range=[0, _y_upper]))
-            fig2.for_each_trace(lambda t: t.update(
-                hovertemplate='%{x}<br>점유율: %{y:.1f}%<br>판매: %{customdata[0]:,}석 / 오픈: %{customdata[1]:,}석<extra>%{fullData.name}</extra>'
-            ))
-            _scale_label = f"※ Y축 최대 {_y_upper}% 기준"
-        else:
-            fig2 = px.line(filtered_trend, x='기준일자', y=_y_col, color='공연명', markers=True)
-            fig2.update_layout(xaxis_title="기준일자", yaxis_title=_y_col,
-                               yaxis=dict(range=[0, _y_upper]))
-            if _y_col == '합계금액':
-                _scale_label = f"※ Y축 최대 {_y_upper:,.0f} 기준"
+    def _build_color_map(perf_names):
+        return {name: _VIVID_COLORS[i % len(_VIVID_COLORS)] for i, name in enumerate(perf_names)}
+
+    # ── 차트 생성 함수 ──
+    def _render_chart(container, title, cat_perfs, color_map):
+        cat_selected = [p for p in cat_perfs if p in selected_perfs]
+        cat_data = filtered_trend[filtered_trend['공연명'].isin(cat_selected)]
+        with container:
+            if cat_data.empty or _y_col not in cat_data.columns:
+                st.caption(f"{title}: 데이터 없음")
+                return
+
+            _data_max = cat_data[_y_col].max()
+            if _y_col == '점유율(%)':
+                _y_upper = _snap_ymax_pct(_data_max)
             else:
-                _scale_label = f"※ Y축 최대 {_y_upper:,.0f} 기준"
+                _y_upper = _snap_ymax_general(_data_max)
 
-        st.caption(_scale_label)
-        fig2 = apply_common_layout(fig2)
-        st.plotly_chart(fig2, use_container_width=True)
-    else:
-        st.warning(f"데이터에 `{trend_metric}` 컬럼이 없습니다.")
+            if _y_col == '점유율(%)':
+                fig = px.line(cat_data, x='기준일자', y='점유율(%)', color='공연명', markers=True,
+                              hover_data={'합계좌석': ':,', '_오픈석': ':,'},
+                              color_discrete_map=color_map)
+                fig.update_layout(yaxis_title="점유율(%)", yaxis=dict(range=[0, _y_upper]))
+                fig.for_each_trace(lambda t: t.update(
+                    hovertemplate='%{x}<br>점유율: %{y:.1f}%<br>판매: %{customdata[0]:,}석 / 오픈: %{customdata[1]:,}석<extra>%{fullData.name}</extra>'
+                ))
+                _label = f"※ Y축 최대 {_y_upper}% 기준"
+            else:
+                fig = px.line(cat_data, x='기준일자', y=_y_col, color='공연명', markers=True,
+                              color_discrete_map=color_map)
+                fig.update_layout(yaxis_title=_y_col, yaxis=dict(range=[0, _y_upper]))
+                _label = f"※ Y축 최대 {_y_upper:,.0f} 기준"
+
+            fig.update_layout(
+                xaxis_title="", height=400,
+                margin=dict(t=30, b=40, l=50, r=20),
+                legend=dict(orientation="h", yanchor="bottom", y=-0.25, xanchor="center", x=0.5),
+            )
+            fig = apply_common_layout(fig)
+            st.caption(_label)
+            st.plotly_chart(fig, use_container_width=True)
+
+    # ── 좌우 차트 렌더링 ──
+    _chart_left, _chart_right = st.columns(2)
+
+    _commercial_cmap = _build_color_map(_commercial)
+    _public_cmap = _build_color_map(_public)
+
+    _render_chart(_chart_left, "상업성", _commercial, _commercial_cmap)
+    _render_chart(_chart_right, "공공성", _public, _public_cmap)
