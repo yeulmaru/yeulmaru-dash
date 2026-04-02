@@ -465,19 +465,19 @@ if not active_df.empty:
     # 범례 (HTML, 2그룹 좌우 분리)
     leg_l, leg_r = st.columns(2)
     leg_l.markdown(
-        '<div style="font-size:22px;color:#AAA;overflow:visible;margin-bottom:8px;">'
-        '<span style="color:#FF4B4B;font-size:28px;">■</span> ~25% &nbsp;&nbsp;'
-        '<span style="color:#FF8C00;font-size:28px;">■</span> 25~50% &nbsp;&nbsp;'
-        '<span style="color:#FFD700;font-size:28px;">■</span> 50~75% &nbsp;&nbsp;'
-        '<span style="color:#FFFFFF;font-size:28px;">■</span> 75%↑'
+        '<div style="font-size:17px;color:#AAA;overflow:visible;margin-bottom:8px;">'
+        '<span style="color:#FF4B4B;font-size:21px;">■</span> ~25% &nbsp;&nbsp;'
+        '<span style="color:#FF8C00;font-size:21px;">■</span> 25~50% &nbsp;&nbsp;'
+        '<span style="color:#FFD700;font-size:21px;">■</span> 50~75% &nbsp;&nbsp;'
+        '<span style="color:#FFFFFF;font-size:21px;">■</span> 75%↑'
         '</div>',
         unsafe_allow_html=True,
     )
     leg_r.markdown(
-        '<div style="font-size:22px;color:#AAA;text-align:right;overflow:visible;margin-bottom:8px;">'
-        '<span style="color:#FFD700;font-size:28px;">┊</span> 공연별 목표 &nbsp;&nbsp;'
-        '<span style="color:#FF4B4B;font-size:28px;">┊</span> 100% &nbsp;&nbsp;'
-        '<span style="color:#555;font-size:28px;">─</span> D-28'
+        '<div style="font-size:17px;color:#AAA;text-align:right;overflow:visible;margin-bottom:8px;">'
+        '<span style="color:#FFD700;font-size:21px;">┊</span> 공연별 목표 &nbsp;&nbsp;'
+        '<span style="color:#FF4B4B;font-size:21px;">┊</span> 100% &nbsp;&nbsp;'
+        '<span style="color:#555;font-size:21px;">─</span> D-28'
         '</div>',
         unsafe_allow_html=True,
     )
@@ -667,17 +667,18 @@ if not active_df.empty:
     for name, date_str, color, days in zip(y_labels, y_dates, label_colors, y_ddays):
         dday_str = fmt_dday(days) if pd.notna(days) else ''
         dday_color = _label_color(days)
-        lines = f'<span style="color:{color}">{name}</span>'
+        lines = f'<span style="color:{color};font-size:13px;line-height:2;">{name}</span>'
         if date_str:
-            lines += f'<br><span style="color:#999;font-size:10px">{date_str}</span>'
+            lines += f'<br><span style="color:#999;font-size:13px;line-height:2;">{date_str}</span>'
         if dday_str:
-            lines += f'<br><span style="color:{dday_color};font-weight:bold">{dday_str}</span>'
+            lines += f'<br><span style="color:{dday_color};font-size:13px;font-weight:bold;line-height:2;">{dday_str}</span>'
         y_tick_texts.append(lines)
 
     fig.update_layout(
         xaxis_title="", yaxis_title="",
         height=600,
         margin=dict(t=60, l=60),
+        bargap=0.35,
         showlegend=False,
         xaxis=dict(
             tickvals=all_ticks, ticktext=tick_texts,
