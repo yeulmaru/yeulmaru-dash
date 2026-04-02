@@ -443,11 +443,11 @@ if not active_df.empty:
 
     # 막대 색상 — 달성률 기준
     def _bar_color(achieve):
-        if achieve >= 100:
-            return '#0FFD02'
-        if achieve >= 75:
+        if achieve > 75:
+            return '#FFFFFF'
+        if achieve > 50:
             return '#FFD700'
-        if achieve >= 50:
+        if achieve > 25:
             return '#FF8C00'
         return '#FF4B4B'
 
@@ -512,6 +512,18 @@ if not active_df.empty:
             '<extra></extra>'
         ),
     ))
+
+    # 행별 배경색 홀짝 구분 (짝수 행에 미묘한 밝은 배경)
+    for i in range(len(y_labels)):
+        if i % 2 == 1:
+            fig.add_shape(
+                type="rect",
+                x0=0, x1=1, xref="paper",
+                y0=i - 0.5, y1=i + 0.5, yref="y",
+                fillcolor="rgba(255,255,255,0.03)",
+                line=dict(width=0),
+                layer="below",
+            )
 
     # 막대 바깥 텍스트 (annotation으로 강조색 적용)
     G = '#0FFD02'
@@ -590,8 +602,11 @@ if not active_df.empty:
 
     fig.update_layout(
         xaxis_title="점유율 (%)", yaxis_title="",
-        xaxis=dict(tickvals=all_ticks, ticktext=tick_texts),
-        yaxis=dict(ticktext=y_tick_texts, tickvals=y_labels),
+        xaxis=dict(
+            tickvals=all_ticks, ticktext=tick_texts,
+            showgrid=True, gridcolor="rgba(255,255,255,0.08)", gridwidth=1,
+        ),
+        yaxis=dict(ticktext=y_tick_texts, tickvals=y_labels, showgrid=False),
     )
     fig = apply_common_layout(fig)
     st.plotly_chart(fig, use_container_width=True)
@@ -600,10 +615,10 @@ if not active_df.empty:
     st.markdown("""
     <div style="display:flex;flex-wrap:wrap;gap:12px 20px;font-size:11px;color:#AAA;padding:0 4px;">
       <span>■ 달성률 &nbsp;
-        <span style="color:#0FFD02">● 100%↑</span> &nbsp;
-        <span style="color:#FFD700">● 75~99%</span> &nbsp;
-        <span style="color:#FF8C00">● 50~74%</span> &nbsp;
-        <span style="color:#FF4B4B">● 50%↓</span>
+        <span style="color:#FFFFFF">● 75%↑</span> &nbsp;
+        <span style="color:#FFD700">● 50~75%</span> &nbsp;
+        <span style="color:#FF8C00">● 25~50%</span> &nbsp;
+        <span style="color:#FF4B4B">● ~25%</span>
       </span>
       <span style="color:#FFD700">┆</span> <span>공연별 목표</span>
       <span style="color:#FF4B4B">┆</span> <span>100%</span>
