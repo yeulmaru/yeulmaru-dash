@@ -47,7 +47,10 @@ else:
     base_dt = pd.to_datetime(base_date, errors='coerce')
 
 if pd.notna(base_dt):
-    base_date_str = base_dt.strftime('%Y년 %m월 %d일') + f' ({weekdays_kr[base_dt.weekday()]})'
+    # 시간 정보가 없으면(자정) 기본값 10:00:00 적용
+    if base_dt.hour == 0 and base_dt.minute == 0 and base_dt.second == 0:
+        base_dt = base_dt.replace(hour=10, minute=0, second=0)
+    base_date_str = base_dt.strftime('%Y년 %m월 %d일') + f' ({weekdays_kr[base_dt.weekday()]}) {base_dt.strftime("%H:%M:%S")}'
 else:
     base_date_str = str(base_date)
     base_dt = None
@@ -423,7 +426,7 @@ renew_color = '#FF8C00' if dates_differ else '#0FFD02'
 col5.markdown(
     f'<div style="font-size:14px;color:#AAA;">오늘</div>'
     f'<div style="font-size:20px;font-weight:600;">{today_str}</div>'
-    f'<div style="font-size:14px;color:#AAA;margin-top:4px;">갱신일자</div>'
+    f'<div style="font-size:14px;color:#AAA;margin-top:4px;">갱신 일시</div>'
     f'<div style="font-size:20px;font-weight:600;color:{renew_color};">{base_date_str}</div>',
     unsafe_allow_html=True,
 )
