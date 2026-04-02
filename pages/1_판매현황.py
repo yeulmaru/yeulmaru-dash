@@ -3,6 +3,7 @@ import pandas as pd
 import plotly.graph_objects as go
 import plotly.express as px
 from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from utils.data_loader import load_daily_input, load_sales_trend, get_base_date, load_performance_master, load_round_details, get_data_source
 from utils.charts import COLORS, apply_common_layout
@@ -36,8 +37,8 @@ if daily_df is None or trend_df is None:
 # ── 날짜 파싱 ──
 weekdays_kr = ['월', '화', '수', '목', '금', '토', '일']
 
-# 오늘 (시스템)
-now_dt = datetime.now()
+# 오늘 (한국 시간 기준)
+now_dt = datetime.now(ZoneInfo("Asia/Seoul"))
 today_str = now_dt.strftime('%Y년 %m월 %d일') + f' ({weekdays_kr[now_dt.weekday()]})'
 
 # 갱신일자 (엑셀 B2)
