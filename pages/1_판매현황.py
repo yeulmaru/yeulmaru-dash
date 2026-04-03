@@ -832,6 +832,12 @@ if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in 
     div[data-testid="stVerticalBlockBorderWrapper"] [data-testid="stColumn"] {
         padding: 2px 4px !important;
     }
+    div[data-testid="stVerticalBlockBorderWrapper"] [data-testid="stCheckbox"] {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding-top: 6px;
+    }
     </style>''', unsafe_allow_html=True)
 
     # ── 공연 선택 표 (체크박스 + 색상 공연명, 테이블 스타일) ──
@@ -845,7 +851,7 @@ if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in 
             with st.container(border=True):
                 # 헤더
                 _hdr = st.columns([0.4, 0.8, 2.4], gap="small")
-                _hdr[0].markdown('<div style="padding:14px 8px;font-size:12px;color:#FFFFFF;font-weight:bold;text-align:center;">✓</div>', unsafe_allow_html=True)
+                _hdr[0].markdown('<div style="padding:14px 8px;font-size:12px;color:#FFFFFF;font-weight:bold;text-align:center;">선택</div>', unsafe_allow_html=True)
                 _hdr[1].markdown('<div style="padding:14px 8px;font-size:12px;color:#FFFFFF;font-weight:bold;">공연일</div>', unsafe_allow_html=True)
                 _hdr[2].markdown('<div style="padding:14px 8px;font-size:12px;color:#FFFFFF;font-weight:bold;">공연명</div>', unsafe_allow_html=True)
                 # 데이터 행
