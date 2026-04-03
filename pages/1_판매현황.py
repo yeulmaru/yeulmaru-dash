@@ -845,9 +845,9 @@ if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in 
             with st.container(border=True):
                 # 헤더
                 _hdr = st.columns([0.4, 0.8, 2.4], gap="small")
-                _hdr[0].markdown('<div style="padding:6px 8px;font-size:12px;color:#555;text-align:center;">✓</div>', unsafe_allow_html=True)
-                _hdr[1].markdown('<div style="padding:6px 8px;font-size:12px;color:#AAA;">공연일</div>', unsafe_allow_html=True)
-                _hdr[2].markdown('<div style="padding:6px 8px;font-size:12px;color:#AAA;">공연명</div>', unsafe_allow_html=True)
+                _hdr[0].markdown('<div style="padding:14px 8px;font-size:12px;color:#FFFFFF;font-weight:bold;text-align:center;">✓</div>', unsafe_allow_html=True)
+                _hdr[1].markdown('<div style="padding:14px 8px;font-size:12px;color:#FFFFFF;font-weight:bold;">공연일</div>', unsafe_allow_html=True)
+                _hdr[2].markdown('<div style="padding:14px 8px;font-size:12px;color:#FFFFFF;font-weight:bold;">공연명</div>', unsafe_allow_html=True)
                 # 데이터 행
                 for i, pname in enumerate(perf_names):
                     date_str = perf_date_map.get(pname, '')
