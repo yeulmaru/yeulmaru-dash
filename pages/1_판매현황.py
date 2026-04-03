@@ -805,31 +805,55 @@ if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in 
     _color_map_commercial = _build_color_map(_commercial)
     _color_map_public = _build_color_map(_public)
 
-    # ── 공연 선택 표 (체크박스 + 색상 공연명) ──
+    # ── 체크리스트 테이블 CSS (외곽선·행/열 구분선) ──
+    st.markdown('''<style>
+    div[data-testid="stVerticalBlockBorderWrapper"] > div[data-testid="stVerticalBlock"] {
+        gap: 0 !important;
+    }
+    div[data-testid="stVerticalBlockBorderWrapper"] [data-testid="stHorizontalBlock"] {
+        border-bottom: 1px solid #333;
+    }
+    div[data-testid="stVerticalBlockBorderWrapper"] [data-testid="stHorizontalBlock"]:first-of-type {
+        border-bottom: 2px solid #555;
+    }
+    div[data-testid="stVerticalBlockBorderWrapper"] [data-testid="stHorizontalBlock"]:last-of-type {
+        border-bottom: none;
+    }
+    div[data-testid="stVerticalBlockBorderWrapper"] [data-testid="stColumn"]:not(:last-child) {
+        border-right: 1px solid #333;
+    }
+    div[data-testid="stVerticalBlockBorderWrapper"] [data-testid="stColumn"] {
+        padding: 2px 4px !important;
+    }
+    </style>''', unsafe_allow_html=True)
+
+    # ── 공연 선택 표 (체크박스 + 색상 공연명, 테이블 스타일) ──
     def _render_checklist(container, title, perf_names, editor_key, color_map):
         with container:
             st.markdown(f'<div style="{_LABEL_STYLE}">{title}</div>', unsafe_allow_html=True)
             if not perf_names:
                 st.caption("해당 공연 없음")
                 return []
-            # 헤더
-            _hdr = st.columns([0.4, 1.2, 2])
-            _hdr[0].markdown('<span style="font-size:12px;color:#AAA;"></span>', unsafe_allow_html=True)
-            _hdr[1].markdown('<span style="font-size:12px;color:#AAA;">공연일</span>', unsafe_allow_html=True)
-            _hdr[2].markdown('<span style="font-size:12px;color:#AAA;">공연명</span>', unsafe_allow_html=True)
             selected = []
-            for i, pname in enumerate(perf_names):
-                date_str = perf_date_map.get(pname, '')
-                color = color_map.get(pname, '#FFF')
-                cols = st.columns([0.4, 1.2, 2])
-                with cols[0]:
-                    checked = st.checkbox('', value=True, key=f"{editor_key}_{i}", label_visibility="collapsed")
-                with cols[1]:
-                    st.markdown(f'<span style="font-size:14px;color:#CCC;line-height:2.4;">{date_str}</span>', unsafe_allow_html=True)
-                with cols[2]:
-                    st.markdown(f'<span style="font-size:14px;color:{color};font-weight:500;line-height:2.4;">{pname}</span>', unsafe_allow_html=True)
-                if checked:
-                    selected.append(pname)
+            with st.container(border=True):
+                # 헤더
+                _hdr = st.columns([0.4, 1.2, 2], gap="small")
+                _hdr[0].markdown('<div style="padding:6px 8px;font-size:12px;color:#555;text-align:center;">✓</div>', unsafe_allow_html=True)
+                _hdr[1].markdown('<div style="padding:6px 8px;font-size:12px;color:#AAA;">공연일</div>', unsafe_allow_html=True)
+                _hdr[2].markdown('<div style="padding:6px 8px;font-size:12px;color:#AAA;">공연명</div>', unsafe_allow_html=True)
+                # 데이터 행
+                for i, pname in enumerate(perf_names):
+                    date_str = perf_date_map.get(pname, '')
+                    color = color_map.get(pname, '#FFF')
+                    cols = st.columns([0.4, 1.2, 2], gap="small")
+                    with cols[0]:
+                        checked = st.checkbox('', value=True, key=f"{editor_key}_{i}", label_visibility="collapsed")
+                    with cols[1]:
+                        st.markdown(f'<div style="padding:6px 8px;font-size:14px;color:#CCC;">{date_str}</div>', unsafe_allow_html=True)
+                    with cols[2]:
+                        st.markdown(f'<div style="padding:6px 8px;font-size:14px;color:{color};font-weight:500;">{pname}</div>', unsafe_allow_html=True)
+                    if checked:
+                        selected.append(pname)
             return selected
 
     _tbl_left, _tbl_right = st.columns(2)
