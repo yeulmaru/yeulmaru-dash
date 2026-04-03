@@ -857,11 +857,11 @@ if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in 
             return selected
 
     # ── 상업성: 표 + 차트 좌우 배치 ──
-    _comm_tbl, _comm_chart = st.columns([1, 2])
+    _comm_tbl, _comm_chart = st.columns([1, 1])
     _sel_commercial = _render_checklist(_comm_tbl, "상업성", _commercial, "_trend_ed_commercial", _color_map_commercial)
 
     # ── 공공성: 표 + 차트 좌우 배치 ──
-    _pub_tbl, _pub_chart = st.columns([1, 2])
+    _pub_tbl, _pub_chart = st.columns([1, 1])
     _sel_public = _render_checklist(_pub_tbl, "공공성", _public, "_trend_ed_public", _color_map_public)
 
     selected_perfs = _sel_commercial + _sel_public
@@ -1025,7 +1025,7 @@ if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in 
                         )
 
             fig.update_layout(
-                xaxis_title="", yaxis_title="", height=400,
+                xaxis_title="", yaxis_title="", height=350,
                 margin=dict(t=50, b=30, l=50, r=20),
                 showlegend=False,
                 yaxis=dict(range=[0, _y_upper], tickvals=_yticks, ticktext=_ytick_texts),
