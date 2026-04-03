@@ -8,6 +8,13 @@ from zoneinfo import ZoneInfo
 from utils.data_loader import load_daily_input, load_sales_trend, get_base_date, load_performance_master, load_round_details, get_data_source
 from utils.charts import COLORS, apply_common_layout
 
+
+def get_contrast_text_color(hex_color):
+    hex_color = hex_color.lstrip('#')
+    r, g, b = int(hex_color[0:2], 16), int(hex_color[2:4], 16), int(hex_color[4:6], 16)
+    luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
+    return "#000000" if luminance > 0.5 else "#FFFFFF"
+
 st.set_page_config(page_title="실시간 판매현황", page_icon="📊", layout="wide")
 
 from utils.auth import check_password
@@ -1063,7 +1070,7 @@ if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in 
                         fig.add_annotation(
                             x=_dates[j + 1], y=float(_vals[j + 1]),
                             text="정체", showarrow=False,
-                            font=dict(size=9, color='#FFFFFF'),
+                            font=dict(size=9, color=get_contrast_text_color(_line_color)),
                             bgcolor=_line_color, borderpad=2,
                             yshift=10, xanchor='center',
                         )
