@@ -856,9 +856,14 @@ if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in 
                         selected.append(pname)
             return selected
 
-    _tbl_left, _tbl_right = st.columns(2)
-    _sel_commercial = _render_checklist(_tbl_left, "상업성", _commercial, "_trend_ed_commercial", _color_map_commercial)
-    _sel_public = _render_checklist(_tbl_right, "공공성", _public, "_trend_ed_public", _color_map_public)
+    # ── 상업성: 표 + 차트 좌우 배치 ──
+    _comm_tbl, _comm_chart = st.columns([1, 2])
+    _sel_commercial = _render_checklist(_comm_tbl, "상업성", _commercial, "_trend_ed_commercial", _color_map_commercial)
+
+    # ── 공공성: 표 + 차트 좌우 배치 ──
+    _pub_tbl, _pub_chart = st.columns([1, 2])
+    _sel_public = _render_checklist(_pub_tbl, "공공성", _public, "_trend_ed_public", _color_map_public)
+
     selected_perfs = _sel_commercial + _sel_public
 
     # ── 공통 데이터 준비 ──
@@ -1067,14 +1072,5 @@ if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in 
             fig = apply_common_layout(fig)
             st.plotly_chart(fig, use_container_width=True)
 
-            # 커스텀 범례 (차트 아래 별도 영역)
-            _leg_html = '<div style="display:flex;flex-wrap:wrap;gap:6px 16px;padding:2px 0;">'
-            for pname in cat_selected:
-                c = color_map.get(pname, '#FFF')
-                _leg_html += f'<span style="font-size:12px;color:#CCC;white-space:nowrap;"><span style="color:{c};">●</span> {pname}</span>'
-            _leg_html += '</div>'
-            st.markdown(_leg_html, unsafe_allow_html=True)
-
-    _chart_left, _chart_right = st.columns(2)
-    _render_chart(_chart_left, "상업성", _commercial, _color_map_commercial)
-    _render_chart(_chart_right, "공공성", _public, _color_map_public)
+    _render_chart(_comm_chart, "상업성", _commercial, _color_map_commercial)
+    _render_chart(_pub_chart, "공공성", _public, _color_map_public)
