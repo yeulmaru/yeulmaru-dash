@@ -795,42 +795,46 @@ if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in 
 
     _LABEL_STYLE = 'font-size:24px;font-weight:bold;color:#0FFD02;margin:0 0 12px 0;'
 
-    # ── 공연 선택 표 (st.data_editor 기반) ──
-    def _build_editor_df(perf_names):
-        rows = []
-        for pname in perf_names:
-            date_str = perf_date_map.get(pname, '')
-            rows.append({'선택': True, '공연일': date_str, '공연명': pname})
-        return pd.DataFrame(rows)
+    # ── 공연별 색상 팔레트 ──
+    _VIVID_COLORS = ['#FF6B8A', '#64B5F6', '#00FF00', '#FFFF00', '#FF8000', '#8000FF', '#00FFFF']
 
-    def _render_checklist(container, title, perf_names, editor_key):
+    def _build_color_map(perf_names):
+        return {name: _VIVID_COLORS[i % len(_VIVID_COLORS)] for i, name in enumerate(perf_names)}
+
+    # ── 색상 맵 미리 생성 (체크리스트 + 차트 공유) ──
+    _color_map_commercial = _build_color_map(_commercial)
+    _color_map_public = _build_color_map(_public)
+
+    # ── 공연 선택 표 (체크박스 + 색상 공연명) ──
+    def _render_checklist(container, title, perf_names, editor_key, color_map):
         with container:
             st.markdown(f'<div style="{_LABEL_STYLE}">{title}</div>', unsafe_allow_html=True)
             if not perf_names:
                 st.caption("해당 공연 없음")
-                return pd.DataFrame(columns=['선택', '공연일', '공연명'])
-            df = _build_editor_df(perf_names)
-            edited = st.data_editor(
-                df,
-                column_config={
-                    '선택': st.column_config.CheckboxColumn('', width=50, default=True),
-                    '공연일': st.column_config.TextColumn('공연일', width=120),
-                    '공연명': st.column_config.TextColumn('공연명'),
-                },
-                disabled=['공연일', '공연명'],
-                hide_index=True,
-                use_container_width=True,
-                key=editor_key,
-                height=35 + len(perf_names) * 35,
-            )
-            return edited
+                return []
+            # 헤더
+            _hdr = st.columns([0.4, 1.2, 2])
+            _hdr[0].markdown('<span style="font-size:12px;color:#AAA;"></span>', unsafe_allow_html=True)
+            _hdr[1].markdown('<span style="font-size:12px;color:#AAA;">공연일</span>', unsafe_allow_html=True)
+            _hdr[2].markdown('<span style="font-size:12px;color:#AAA;">공연명</span>', unsafe_allow_html=True)
+            selected = []
+            for i, pname in enumerate(perf_names):
+                date_str = perf_date_map.get(pname, '')
+                color = color_map.get(pname, '#FFF')
+                cols = st.columns([0.4, 1.2, 2])
+                with cols[0]:
+                    checked = st.checkbox('', value=True, key=f"{editor_key}_{i}", label_visibility="collapsed")
+                with cols[1]:
+                    st.markdown(f'<span style="font-size:14px;color:#CCC;line-height:2.4;">{date_str}</span>', unsafe_allow_html=True)
+                with cols[2]:
+                    st.markdown(f'<span style="font-size:14px;color:{color};font-weight:500;line-height:2.4;">{pname}</span>', unsafe_allow_html=True)
+                if checked:
+                    selected.append(pname)
+            return selected
 
     _tbl_left, _tbl_right = st.columns(2)
-    _ed_commercial = _render_checklist(_tbl_left, "상업성", _commercial, "_trend_ed_commercial")
-    _ed_public = _render_checklist(_tbl_right, "공공성", _public, "_trend_ed_public")
-
-    _sel_commercial = _ed_commercial[_ed_commercial['선택'] == True]['공연명'].tolist() if not _ed_commercial.empty else []
-    _sel_public = _ed_public[_ed_public['선택'] == True]['공연명'].tolist() if not _ed_public.empty else []
+    _sel_commercial = _render_checklist(_tbl_left, "상업성", _commercial, "_trend_ed_commercial", _color_map_commercial)
+    _sel_public = _render_checklist(_tbl_right, "공공성", _public, "_trend_ed_public", _color_map_public)
     selected_perfs = _sel_commercial + _sel_public
 
     # ── 공통 데이터 준비 ──
@@ -926,11 +930,6 @@ if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in 
         return None
 
     # ── 영역4: 차트 ──
-    _VIVID_COLORS = ['#FF0000', '#0000FF', '#00FF00', '#FFFF00', '#FF8000', '#8000FF', '#00FFFF']
-
-    def _build_color_map(perf_names):
-        return {name: _VIVID_COLORS[i % len(_VIVID_COLORS)] for i, name in enumerate(perf_names)}
-
     def _render_chart(container, title, cat_perfs, color_map):
         cat_selected = [p for p in cat_perfs if p in selected_perfs]
         cat_data = filtered_trend[filtered_trend['공연명'].isin(cat_selected)]
@@ -1035,8 +1034,8 @@ if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in 
                         fig.add_annotation(
                             x=_dates[j + 1], y=float(_vals[j + 1]),
                             text="정체", showarrow=False,
-                            font=dict(size=9, color=_line_color),
-                            bgcolor='rgba(0,0,0,0.85)', borderpad=2,
+                            font=dict(size=9, color='#FFFFFF'),
+                            bgcolor=_line_color, borderpad=2,
                             yshift=10, xanchor='center',
                         )
                     _prev_stag = is_stag
@@ -1053,5 +1052,5 @@ if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in 
             st.markdown(_leg_html, unsafe_allow_html=True)
 
     _chart_left, _chart_right = st.columns(2)
-    _render_chart(_chart_left, "상업성", _commercial, _build_color_map(_commercial))
-    _render_chart(_chart_right, "공공성", _public, _build_color_map(_public))
+    _render_chart(_chart_left, "상업성", _commercial, _color_map_commercial)
+    _render_chart(_chart_right, "공공성", _public, _color_map_public)
