@@ -115,10 +115,11 @@ def _load_prev_day_data(trend_df, base_date_ts):
     result = {}
     for _, r in prev_df.iterrows():
         name = str(r['공연명']).strip()
-        result[name] = {
-            '합계좌석': int(r['합계좌석']) if pd.notna(r['합계좌석']) else 0,
-            '합계금액': int(r['합계금액']) if pd.notna(r['합계금액']) else 0,
-        }
+        entry = {}
+        for col in ['유료좌석', '유료금액', '무료좌석', '합계좌석', '합계금액']:
+            if col in r.index and pd.notna(r[col]):
+                entry[col] = int(r[col])
+        result[name] = entry
     return result, prev_date
 
 
@@ -356,7 +357,7 @@ for card_idx, (_, perf) in enumerate(active_df.iterrows()):
         with hdr_l:
             st.markdown(
                 f'{_badge_html(category)} &nbsp; '
-                f'<span style="font-size:20px;font-weight:700;">{perf_name}</span>',
+                f'<span style="font-size:20px;font-weight:700;color:{ACCENT};">{perf_name}</span>',
                 unsafe_allow_html=True,
             )
         with hdr_r:
@@ -371,13 +372,6 @@ for card_idx, (_, perf) in enumerate(active_df.iterrows()):
         ic[1].markdown(f"**회차** &nbsp; {total_rounds}회")
         ic[2].markdown(f"**오픈석** &nbsp; {total_open:,}석")
         ic[3].markdown(f"**목표** &nbsp; {target_occ}%")
-
-        if prev:
-            st.markdown(
-                f'<div style="font-size:12px;color:#888;margin:4px 0;">'
-                f'전일 참고: 좌석 {prev["합계좌석"]:,}석 / 금액 {prev["합계금액"]:,}원</div>',
-                unsafe_allow_html=True,
-            )
 
         st.markdown("")
 
@@ -433,50 +427,130 @@ for card_idx, (_, perf) in enumerate(active_df.iterrows()):
             result = _render_input_row(
                 perf_id, 1, base_seat,
                 (input_cols[0], input_cols[1], input_cols[2]),
-                prefill=today_pf,
             )
             round_results.append(result)
 
-        # ── 미리보기 ──
-        total_seats = sum(r['합계좌석'] for r in round_results)
-        total_amount = sum(r['합계금액'] for r in round_results)
-        occ_pct = min(total_seats / total_open * 100, 100.0) if total_open > 0 else 0.0
+        # ── 지표 4개 (현재값 + 입력 시 delta) ──
+        # 현재 저장된 값 (today 있으면 today, 없으면 전일)
+        current = today_pf if today_pf else (prev or {})
+        cur_paid = int(current.get('유료좌석', 0) or 0)
+        cur_free = int(current.get('무료좌석', 0) or 0)
+        cur_seats = int(current.get('합계좌석', 0) or 0)
+        cur_amount = int(current.get('합계금액', 0) or 0)
+        cur_occ = (cur_seats / total_open * 100) if total_open > 0 else 0.0
+        cur_vs_tgt = cur_occ - target_occ
 
-        diff_seats_str, diff_amount_str = "", ""
-        if prev:
-            ds = total_seats - prev['합계좌석']
-            da = total_amount - prev['합계금액']
-            diff_seats_str = f"+{ds}" if ds > 0 else str(ds) if ds != 0 else "0"
-            diff_amount_str = f"+{da:,}" if da > 0 else f"{da:,}" if da != 0 else "0"
+        # 입력 값
+        has_input_data = any(r['has_input'] for r in round_results)
+        in_paid = sum(r['유료좌석'] for r in round_results)
+        in_free = sum(r['무료좌석'] for r in round_results)
+        in_seats = sum(r['합계좌석'] for r in round_results)
+        in_amount = sum(r['합계금액'] for r in round_results)
+        in_occ = (in_seats / total_open * 100) if total_open > 0 else 0.0
+        in_vs_tgt = in_occ - target_occ
 
-        occ_diff = occ_pct - target_occ
-        occ_diff_color = ACCENT if occ_diff >= 0 else "#FF4B4B"
-        occ_diff_str = f"+{occ_diff:.1f}" if occ_diff >= 0 else f"{occ_diff:.1f}"
+        # 표시값: 입력 있으면 입력값, 없으면 현재 DB값
+        if has_input_data:
+            d_paid, d_free, d_seats, d_amount = in_paid, in_free, in_seats, in_amount
+            d_occ, d_vs_tgt = in_occ, in_vs_tgt
+            delta_seats = in_seats - cur_seats
+            delta_amount = in_amount - cur_amount
+            delta_occ = in_occ - cur_occ
+        else:
+            d_paid, d_free, d_seats, d_amount = cur_paid, cur_free, cur_seats, cur_amount
+            d_occ, d_vs_tgt = cur_occ, cur_vs_tgt
+            delta_seats, delta_amount, delta_occ = 0, 0, 0.0
+
+        def _delta_html(val, fmt_fn, show):
+            if not show or val == 0:
+                return ""
+            color = ACCENT if val > 0 else "#FF4B4B"
+            sign = "▲ +" if val > 0 else "▼ "
+            return (f'<div style="font-size:13px;color:{color};font-weight:600;'
+                    f'margin-top:2px;">{sign}{fmt_fn(abs(val))}</div>')
 
         st.markdown("---")
-        mc = st.columns(5)
-        mc[0].metric("합계좌석", f"{total_seats:,}석",
-                     delta=diff_seats_str if diff_seats_str else None)
-        mc[1].metric("합계금액", f"{total_amount:,}원",
-                     delta=diff_amount_str if diff_amount_str else None)
-        mc[2].markdown(
-            f'<div style="font-size:14px;color:#AAA;">점유율</div>'
-            f'<div style="font-size:28px;font-weight:700;color:{ACCENT};">{occ_pct:.1f}%</div>',
-            unsafe_allow_html=True,
-        )
-        mc[3].markdown(
-            f'<div style="font-size:14px;color:#AAA;">목표 대비</div>'
-            f'<div style="font-size:24px;font-weight:700;color:{occ_diff_color};">'
-            f'{occ_diff_str}%p</div>',
-            unsafe_allow_html=True,
-        )
-        mc[4].markdown(
-            f'<div style="font-size:14px;color:#AAA;">목표</div>'
-            f'<div style="font-size:24px;font-weight:600;">{target_occ}%</div>',
-            unsafe_allow_html=True,
-        )
+        mc = st.columns(4)
+
+        with mc[0]:
+            st.markdown(
+                f'<div style="color:#AAA;font-size:12px;">누적</div>'
+                f'<div style="font-size:26px;font-weight:700;color:{ACCENT};line-height:1.15;">'
+                f'{d_seats:,}석</div>'
+                f'<div style="font-size:11px;color:#888;">유료 {d_paid:,} + 무료 {d_free:,}</div>'
+                + _delta_html(delta_seats, lambda v: f"{v:,}석", has_input_data),
+                unsafe_allow_html=True,
+            )
+
+        with mc[1]:
+            st.markdown(
+                f'<div style="color:#AAA;font-size:12px;">판매금액</div>'
+                f'<div style="font-size:26px;font-weight:700;color:{ACCENT};line-height:1.15;">'
+                f'{d_amount/10000:,.1f}만원</div>'
+                f'<div style="font-size:11px;color:#888;">&nbsp;</div>'
+                + _delta_html(delta_amount, lambda v: f"{v/10000:,.1f}만원", has_input_data),
+                unsafe_allow_html=True,
+            )
+
+        with mc[2]:
+            st.markdown(
+                f'<div style="color:#AAA;font-size:12px;">점유율</div>'
+                f'<div style="font-size:26px;font-weight:700;color:{ACCENT};line-height:1.15;">'
+                f'{d_occ:.1f}%</div>'
+                f'<div style="font-size:11px;color:#888;">{d_seats:,} / {total_open:,}석</div>'
+                + _delta_html(delta_occ, lambda v: f"{v:.1f}%p", has_input_data),
+                unsafe_allow_html=True,
+            )
+
+        with mc[3]:
+            tgt_color = ACCENT if d_vs_tgt >= 0 else "#FF4B4B"
+            vs_sign = "+" if d_vs_tgt >= 0 else ""
+            st.markdown(
+                f'<div style="color:#AAA;font-size:12px;">목표 대비</div>'
+                f'<div style="font-size:26px;font-weight:700;color:{tgt_color};line-height:1.15;">'
+                f'{vs_sign}{d_vs_tgt:.1f}%p</div>'
+                f'<div style="font-size:11px;color:#888;">목표: {target_occ}%</div>'
+                + _delta_html(delta_occ, lambda v: f"{v:.1f}%p", has_input_data),
+                unsafe_allow_html=True,
+            )
+
+        # ── 추이 미니 차트 (해당 공연 최근 14일) ──
+        if trend_df is not None and not trend_df.empty:
+            import altair as alt
+            _ps = str(perf_name).strip()
+            _tdf = trend_df.copy()
+            _tdf['기준일자'] = pd.to_datetime(_tdf['기준일자'], errors='coerce')
+            _tdf = _tdf.dropna(subset=['기준일자'])
+            _mask = _tdf['공연명'].astype(str).apply(
+                lambda x: _ps in x.strip() or x.strip() in _ps
+            )
+            _pt = _tdf[_mask].sort_values('기준일자').tail(14)
+            if not _pt.empty and len(_pt) >= 2:
+                _pt = _pt[['기준일자', '합계좌석', '합계금액']].copy()
+                _pt['판매금액(만원)'] = (_pt['합계금액'] / 10000).round(1)
+                chart = alt.Chart(_pt).mark_line(
+                    color=ACCENT, strokeWidth=2,
+                    point=alt.OverlayMarkDef(color=ACCENT, size=50, filled=True),
+                ).encode(
+                    x=alt.X('기준일자:T', title=None,
+                            axis=alt.Axis(format='%m/%d', labelFontSize=10, grid=False)),
+                    y=alt.Y('합계좌석:Q', title='누적 좌석',
+                            axis=alt.Axis(labelFontSize=10, titleFontSize=11,
+                                          grid=True, gridColor='#333', gridOpacity=0.3)),
+                    tooltip=[
+                        alt.Tooltip('기준일자:T', title='날짜', format='%Y-%m-%d'),
+                        alt.Tooltip('합계좌석:Q', title='누적 좌석', format=','),
+                        alt.Tooltip('판매금액(만원):Q', title='금액(만원)', format='.1f'),
+                    ],
+                ).properties(height=130).configure_view(strokeWidth=0)
+                st.altair_chart(chart, use_container_width=True)
+            else:
+                st.caption("📊 누적 판매 데이터가 부족해서 추이 표시 불가")
 
         # ── 카드별 저장 버튼 ──
+        # 호환성 alias (혹시 다른 코드에서 쓸 경우)
+        total_seats = in_seats
+        total_amount = in_amount
         any_input = any(r['has_input'] for r in round_results)
         btn_label = f"💾 이 공연 저장"
 
