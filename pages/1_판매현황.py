@@ -71,6 +71,12 @@ if '공연명' not in daily_df.columns:
     st.warning("데이터에 '공연명' 컬럼이 없습니다.")
     st.stop()
 
+# 기준일자 → datetime 변환 (공연별 최신 행 선택용)
+daily_df['_date_dt'] = pd.to_datetime(
+    daily_df['기준일자'].astype('Int64').astype(str),
+    format='%Y%m%d',
+    errors='coerce'
+)
 daily_df['_sort_key'] = range(len(daily_df))
 
 # ── 공연마스터 · 회차상세 로드 ──
@@ -127,8 +133,9 @@ def _fmt_perf_dates(dates):
     return ', '.join(parts)
 
 
-# 공연별 최신 행 (누적기록에서 마지막)
-grouped = daily_df.sort_values('_sort_key').groupby('공연명').last().reset_index()
+# 공연별 최신 행 (기준일자 기반, 동일 날짜는 행 인덱스 큰 쪽 선택)
+_daily_sorted = daily_df.sort_values(['_date_dt', '_sort_key'], ascending=[True, True])
+grouped = _daily_sorted.groupby('공연명', as_index=False).last()
 
 # 공연일(날짜) 컬럼을 datetime으로 통일 (수식 셀이 str/nan 혼재 → dtype 충돌 방지)
 if '공연일(날짜)' in grouped.columns:
@@ -208,8 +215,13 @@ with st.sidebar.expander("디버그: Raw 데이터"):
     st.write(f"**trend_df:** {trend_df.shape[0] if trend_df is not None else 'None'}행")
     if trend_df is not None and '기준일자' in trend_df.columns:
         st.write(f"**trend 날짜 범위:** {trend_df['기준일자'].min()} ~ {trend_df['기준일자'].max()}")
-    st.write("**daily_df 처음 5행:**")
-    st.dataframe(daily_df.head(5), use_container_width=True, hide_index=True)
+    st.write("**daily_df 마지막 10행 (기준일자 desc):**")
+    _dbg = daily_df.sort_values('_date_dt', ascending=False).head(10)
+    st.dataframe(_dbg[['기준일자','공연명','합계좌석','합계금액','갱신시각','데이터유형']],
+                 use_container_width=True, hide_index=True)
+    st.write("**grouped (공연별 최신값):**")
+    st.dataframe(grouped[['공연명','기준일자','합계좌석','합계금액']],
+                 use_container_width=True, hide_index=True)
     if master_df is not None:
         st.write(f"**공연마스터:** {master_df.shape[0]}행")
         st.dataframe(master_df[['사업명', '시작일', '종료일', '기준석', '총회차']].head(), use_container_width=True, hide_index=True)
