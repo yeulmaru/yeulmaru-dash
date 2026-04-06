@@ -23,12 +23,9 @@ venv.bak/
 ehthumbs.db
 Thumbs.db
 
-# Data folder
-# 운영 DB는 DAX 루트의 A 파일 (OneDrive 동기화), 이 repo 내 data/는 legacy fallback용만
+# Data folder - repo 내 data/는 README만 유지, 엑셀은 DAX 루트 운영 DB 사용
 data/*
 !data/README.md
-# B 파일 (미사용, 1단계 작업 잔여물) 제외
-data/yeulmaru_dashboard_db_v1.xlsx
 
 # Backup folders
 _backup/
