@@ -28,3 +28,9 @@ Thumbs.db
 data/*
 !data/*.xlsx
 !data/README.md
+
+# Backup folders
+_backup/
+
+# Claude output reports
+_claude_output/
