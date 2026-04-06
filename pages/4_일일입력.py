@@ -41,12 +41,12 @@ if master_df is None or master_df.empty:
 # ── 페이지 상단 ──
 st.title("📝 일일 판매현황 입력")
 
-# 저장 결과 표시 (이전 저장 결과가 있으면)
+# 저장 결과 표시 (에러는 persistent, 성공은 toast 팝업)
 for sr in st.session_state.save_results:
     if sr['status'] == 'error':
         st.error(f"❌ {sr['perf']}: {sr['message']}")
     else:
-        st.success(f"✅ {sr['perf']}: {sr['message']}")
+        st.toast(f"✅ {sr['perf']}: {sr['message']}", icon="✅")
 st.session_state.save_results = []
 
 # 미저장 경고 배너

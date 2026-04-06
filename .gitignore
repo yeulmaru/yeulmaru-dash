@@ -23,11 +23,12 @@ venv.bak/
 ehthumbs.db
 Thumbs.db
 
-# Data folder (Exclude all except .xlsx)
-# 만약 다른 잡다한 파일이 생기면 제외하고 엑셀 파일만 깃에 올립니다.
+# Data folder
+# 운영 DB는 DAX 루트의 A 파일 (OneDrive 동기화), 이 repo 내 data/는 legacy fallback용만
 data/*
-!data/*.xlsx
 !data/README.md
+# B 파일 (미사용, 1단계 작업 잔여물) 제외
+data/yeulmaru_dashboard_db_v1.xlsx
 
 # Backup folders
 _backup/
