@@ -142,6 +142,38 @@ def _load_today_data(trend_df, base_date_ts):
     return result
 
 
+def _load_latest_for_perf(trend_df, perf_name, base_date_ts):
+    """해당 공연의 base_date 이하 가장 최근 저장값 반환 (오늘 포함)"""
+    if trend_df is None or trend_df.empty:
+        return None
+    tdf = trend_df.copy()
+    tdf['기준일자'] = pd.to_datetime(tdf['기준일자'], errors='coerce')
+    tdf = tdf.dropna(subset=['기준일자'])
+    tdf = tdf[tdf['기준일자'] <= base_date_ts]
+    perf_s = str(perf_name).strip()
+    mask = tdf['공연명'].astype(str).apply(
+        lambda x: x.strip() == perf_s or perf_s in x.strip() or x.strip() in perf_s
+    )
+    perf_df = tdf[mask]
+    if perf_df.empty:
+        return None
+    latest = perf_df.sort_values('기준일자').iloc[-1]
+    def _i(col):
+        v = latest.get(col)
+        try:
+            return int(v) if pd.notna(v) else 0
+        except (ValueError, TypeError):
+            return 0
+    return {
+        '유료좌석': _i('유료좌석'),
+        '유료금액': _i('유료금액'),
+        '무료좌석': _i('무료좌석'),
+        '합계좌석': _i('합계좌석'),
+        '합계금액': _i('합계금액'),
+        '기준일자': latest['기준일자'],
+    }
+
+
 prev_data, prev_date = _load_prev_day_data(trend_df, today)
 today_data = _load_today_data(trend_df, today)
 
@@ -242,8 +274,8 @@ def _render_input_row(perf_id, round_no, seat_capacity, cols_spec, prefill=None)
 
 
 # ── 저장 실행 함수 ──
-def _do_save_perf(perf, perf_rounds_info, round_results, prev):
-    """한 공연의 모든 회차를 저장. 반환: list of result dicts"""
+def _do_save_perf(perf, perf_rounds_info, round_results, prev, current=None):
+    """한 공연의 모든 회차를 저장 (current + input 누적). 반환: list of result dicts"""
     perf_name = str(perf['사업명']).strip()
     base_seat = int(perf['기준석']) if pd.notna(perf['기준석']) else 926
     total_rounds = int(perf['총회차']) if pd.notna(perf['총회차']) else 1
@@ -252,15 +284,21 @@ def _do_save_perf(perf, perf_rounds_info, round_results, prev):
     prev_seats = prev['합계좌석'] if prev else 0
     prev_amount = prev['합계금액'] if prev else 0
 
+    # 현재 저장된 값 (누적 시작점)
+    cur = current or {}
+    cur_paid_s = int(cur.get('유료좌석', 0) or 0)
+    cur_paid_a = int(cur.get('유료금액', 0) or 0)
+    cur_free = int(cur.get('무료좌석', 0) or 0)
+
     results = []
 
     if total_rounds > 1 and perf_rounds_info:
-        # 다회차: 전체 합산 1행으로 저장
-        agg_paid_s = sum(r['유료좌석'] for r in round_results)
-        agg_paid_a = sum(r['유료금액'] for r in round_results)
+        # 다회차: 전체 합산 1행으로 저장 (current + input)
+        agg_paid_s = cur_paid_s + sum(r['유료좌석'] for r in round_results)
+        agg_paid_a = cur_paid_a + sum(r['유료금액'] for r in round_results)
         agg_rsv_s = sum(r['예약좌석'] for r in round_results)
         agg_rsv_a = sum(r['예약금액'] for r in round_results)
-        agg_free = sum(r['무료좌석'] for r in round_results)
+        agg_free = cur_free + sum(r['무료좌석'] for r in round_results)
 
         # 공연일/시각: 첫 회차 정보
         first_rd = perf_rounds_info[0]
@@ -285,7 +323,7 @@ def _do_save_perf(perf, perf_rounds_info, round_results, prev):
         res['ts'] = time.time()
         results.append(res)
     else:
-        # 단일회차
+        # 단일회차 (current + input)
         r = round_results[0]
         ri = perf_rounds_info[0] if perf_rounds_info else {}
         perf_date_str = ri.get('date_str', '')
@@ -297,11 +335,11 @@ def _do_save_perf(perf, perf_rounds_info, round_results, prev):
             perf_date_str=perf_date_str,
             round_time=round_time,
             open_seats=base_seat,
-            paid_seats=r['유료좌석'],
-            paid_amount=r['유료금액'],
+            paid_seats=cur_paid_s + r['유료좌석'],
+            paid_amount=cur_paid_a + r['유료금액'],
             rsv_seats=r['예약좌석'],
             rsv_amount=r['예약금액'],
-            free_seats=r['무료좌석'],
+            free_seats=cur_free + r['무료좌석'],
             prev_seats=prev_seats,
             prev_amount=prev_amount,
         )
@@ -350,6 +388,8 @@ for card_idx, (_, perf) in enumerate(active_df.iterrows()):
 
     prev = _match_prev(perf_name, prev_data)
     today_pf = _match_today(perf_name, today_data)
+    # 해당 공연의 최근 저장값 (오늘 포함, 없으면 None)
+    latest_saved = _load_latest_for_perf(trend_df, perf_name, today)
 
     # ── 카드 ──
     with st.container(border=True):
@@ -430,9 +470,9 @@ for card_idx, (_, perf) in enumerate(active_df.iterrows()):
             )
             round_results.append(result)
 
-        # ── 지표 4개 (현재값 + 입력 시 delta) ──
-        # 현재 저장된 값 (today 있으면 today, 없으면 전일)
-        current = today_pf if today_pf else (prev or {})
+        # ── 지표 4개 (현재 누적값 + 입력 시 누적 시뮬레이션) ──
+        # 현재 저장된 값 = 해당 공연의 가장 최근 저장값 (오늘 포함)
+        current = latest_saved or {}
         cur_paid = int(current.get('유료좌석', 0) or 0)
         cur_free = int(current.get('무료좌석', 0) or 0)
         cur_seats = int(current.get('합계좌석', 0) or 0)
@@ -440,22 +480,25 @@ for card_idx, (_, perf) in enumerate(active_df.iterrows()):
         cur_occ = (cur_seats / total_open * 100) if total_open > 0 else 0.0
         cur_vs_tgt = cur_occ - target_occ
 
-        # 입력 값
+        # 입력 값 (추가분)
         has_input_data = any(r['has_input'] for r in round_results)
         in_paid = sum(r['유료좌석'] for r in round_results)
         in_free = sum(r['무료좌석'] for r in round_results)
         in_seats = sum(r['합계좌석'] for r in round_results)
         in_amount = sum(r['합계금액'] for r in round_results)
-        in_occ = (in_seats / total_open * 100) if total_open > 0 else 0.0
-        in_vs_tgt = in_occ - target_occ
 
-        # 표시값: 입력 있으면 입력값, 없으면 현재 DB값
+        # 표시값: 입력 있으면 current + input (누적 시뮬), 없으면 current만
         if has_input_data:
-            d_paid, d_free, d_seats, d_amount = in_paid, in_free, in_seats, in_amount
-            d_occ, d_vs_tgt = in_occ, in_vs_tgt
-            delta_seats = in_seats - cur_seats
-            delta_amount = in_amount - cur_amount
-            delta_occ = in_occ - cur_occ
+            d_paid = cur_paid + in_paid
+            d_free = cur_free + in_free
+            d_seats = cur_seats + in_seats
+            d_amount = cur_amount + in_amount
+            d_occ = (d_seats / total_open * 100) if total_open > 0 else 0.0
+            d_vs_tgt = d_occ - target_occ
+            # delta = 입력값 그대로 (추가분)
+            delta_seats = in_seats
+            delta_amount = in_amount
+            delta_occ = d_occ - cur_occ
         else:
             d_paid, d_free, d_seats, d_amount = cur_paid, cur_free, cur_seats, cur_amount
             d_occ, d_vs_tgt = cur_occ, cur_vs_tgt
@@ -466,38 +509,38 @@ for card_idx, (_, perf) in enumerate(active_df.iterrows()):
                 return ""
             color = ACCENT if val > 0 else "#FF4B4B"
             sign = "▲ +" if val > 0 else "▼ "
-            return (f'<div style="font-size:13px;color:{color};font-weight:600;'
-                    f'margin-top:2px;">{sign}{fmt_fn(abs(val))}</div>')
+            return (f'<div style="font-size:22px;color:{color};font-weight:700;'
+                    f'margin-top:12px;line-height:1.1;">{sign}{fmt_fn(abs(val))}</div>')
 
         st.markdown("---")
         mc = st.columns(4)
 
         with mc[0]:
             st.markdown(
-                f'<div style="color:#AAA;font-size:12px;">누적</div>'
-                f'<div style="font-size:26px;font-weight:700;color:{ACCENT};line-height:1.15;">'
+                f'<div style="color:#AAA;font-size:13px;">누적</div>'
+                f'<div style="font-size:28px;font-weight:700;color:{ACCENT};line-height:1.2;">'
                 f'{d_seats:,}석</div>'
-                f'<div style="font-size:11px;color:#888;">유료 {d_paid:,} + 무료 {d_free:,}</div>'
+                f'<div style="font-size:14px;color:#AAA;margin-top:2px;">유료 {d_paid:,} + 무료 {d_free:,}</div>'
                 + _delta_html(delta_seats, lambda v: f"{v:,}석", has_input_data),
                 unsafe_allow_html=True,
             )
 
         with mc[1]:
             st.markdown(
-                f'<div style="color:#AAA;font-size:12px;">판매금액</div>'
-                f'<div style="font-size:26px;font-weight:700;color:{ACCENT};line-height:1.15;">'
+                f'<div style="color:#AAA;font-size:13px;">판매금액</div>'
+                f'<div style="font-size:28px;font-weight:700;color:{ACCENT};line-height:1.2;">'
                 f'{d_amount/10000:,.1f}만원</div>'
-                f'<div style="font-size:11px;color:#888;">&nbsp;</div>'
+                f'<div style="font-size:14px;color:#AAA;margin-top:2px;">&nbsp;</div>'
                 + _delta_html(delta_amount, lambda v: f"{v/10000:,.1f}만원", has_input_data),
                 unsafe_allow_html=True,
             )
 
         with mc[2]:
             st.markdown(
-                f'<div style="color:#AAA;font-size:12px;">점유율</div>'
-                f'<div style="font-size:26px;font-weight:700;color:{ACCENT};line-height:1.15;">'
+                f'<div style="color:#AAA;font-size:13px;">점유율</div>'
+                f'<div style="font-size:28px;font-weight:700;color:{ACCENT};line-height:1.2;">'
                 f'{d_occ:.1f}%</div>'
-                f'<div style="font-size:11px;color:#888;">{d_seats:,} / {total_open:,}석</div>'
+                f'<div style="font-size:14px;color:#AAA;margin-top:2px;">{d_seats:,} / {total_open:,}석</div>'
                 + _delta_html(delta_occ, lambda v: f"{v:.1f}%p", has_input_data),
                 unsafe_allow_html=True,
             )
@@ -506,46 +549,13 @@ for card_idx, (_, perf) in enumerate(active_df.iterrows()):
             tgt_color = ACCENT if d_vs_tgt >= 0 else "#FF4B4B"
             vs_sign = "+" if d_vs_tgt >= 0 else ""
             st.markdown(
-                f'<div style="color:#AAA;font-size:12px;">목표 대비</div>'
-                f'<div style="font-size:26px;font-weight:700;color:{tgt_color};line-height:1.15;">'
+                f'<div style="color:#AAA;font-size:13px;">목표 대비</div>'
+                f'<div style="font-size:28px;font-weight:700;color:{tgt_color};line-height:1.2;">'
                 f'{vs_sign}{d_vs_tgt:.1f}%p</div>'
-                f'<div style="font-size:11px;color:#888;">목표: {target_occ}%</div>'
+                f'<div style="font-size:14px;color:#AAA;margin-top:2px;">목표: {target_occ}%</div>'
                 + _delta_html(delta_occ, lambda v: f"{v:.1f}%p", has_input_data),
                 unsafe_allow_html=True,
             )
-
-        # ── 추이 미니 차트 (해당 공연 최근 14일) ──
-        if trend_df is not None and not trend_df.empty:
-            import altair as alt
-            _ps = str(perf_name).strip()
-            _tdf = trend_df.copy()
-            _tdf['기준일자'] = pd.to_datetime(_tdf['기준일자'], errors='coerce')
-            _tdf = _tdf.dropna(subset=['기준일자'])
-            _mask = _tdf['공연명'].astype(str).apply(
-                lambda x: _ps in x.strip() or x.strip() in _ps
-            )
-            _pt = _tdf[_mask].sort_values('기준일자').tail(14)
-            if not _pt.empty and len(_pt) >= 2:
-                _pt = _pt[['기준일자', '합계좌석', '합계금액']].copy()
-                _pt['판매금액(만원)'] = (_pt['합계금액'] / 10000).round(1)
-                chart = alt.Chart(_pt).mark_line(
-                    color=ACCENT, strokeWidth=2,
-                    point=alt.OverlayMarkDef(color=ACCENT, size=50, filled=True),
-                ).encode(
-                    x=alt.X('기준일자:T', title=None,
-                            axis=alt.Axis(format='%m/%d', labelFontSize=10, grid=False)),
-                    y=alt.Y('합계좌석:Q', title='누적 좌석',
-                            axis=alt.Axis(labelFontSize=10, titleFontSize=11,
-                                          grid=True, gridColor='#333', gridOpacity=0.3)),
-                    tooltip=[
-                        alt.Tooltip('기준일자:T', title='날짜', format='%Y-%m-%d'),
-                        alt.Tooltip('합계좌석:Q', title='누적 좌석', format=','),
-                        alt.Tooltip('판매금액(만원):Q', title='금액(만원)', format='.1f'),
-                    ],
-                ).properties(height=130).configure_view(strokeWidth=0)
-                st.altair_chart(chart, use_container_width=True)
-            else:
-                st.caption("📊 누적 판매 데이터가 부족해서 추이 표시 불가")
 
         # ── 카드별 저장 버튼 ──
         # 호환성 alias (혹시 다른 코드에서 쓸 경우)
@@ -566,7 +576,7 @@ for card_idx, (_, perf) in enumerate(active_df.iterrows()):
                         st.stop()
 
                 with st.spinner(f"📤 {perf_name} 저장 중..."):
-                    save_res = _do_save_perf(perf, perf_rounds_info, round_results, prev)
+                    save_res = _do_save_perf(perf, perf_rounds_info, round_results, prev, current)
 
                 for sr in save_res:
                     sr['perf'] = perf_name
@@ -601,6 +611,7 @@ for card_idx, (_, perf) in enumerate(active_df.iterrows()):
             'perf_rounds_info': perf_rounds_info,
             'round_results': round_results,
             'prev': prev,
+            'current': current,
             'any_input': any_input,
         })
 
@@ -641,7 +652,7 @@ if has_any:
             with st.spinner(f"📤 {len(input_cards)}개 공연 저장 중..."):
                 for c in input_cards:
                     res = _do_save_perf(c['perf'], c['perf_rounds_info'],
-                                        c['round_results'], c['prev'])
+                                        c['round_results'], c['prev'], c.get('current'))
                     pname = str(c['perf']['사업명']).strip()
                     for r in res:
                         r['perf'] = pname
