@@ -1,11 +1,13 @@
+import io
 import os
 import pandas as pd
+import requests
 import streamlit as st
 
 from utils.local_excel_writer import find_local_excel_path
 
 
-_data_source = "로컬"
+_data_source = "로컬"  # get_excel_data() 호출 시 동적 갱신
 
 
 def get_data_source():
@@ -13,12 +15,97 @@ def get_data_source():
     return _data_source
 
 
+def get_access_token():
+    """Azure AD에서 Microsoft Graph API 액세스 토큰 발급"""
+    tenant_id = st.secrets["azure"]["tenant_id"]
+    client_id = st.secrets["azure"]["client_id"]
+    client_secret = st.secrets["azure"]["client_secret"]
+    url = f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/token"
+    data = {
+        "grant_type": "client_credentials",
+        "client_id": client_id,
+        "client_secret": client_secret,
+        "scope": "https://graph.microsoft.com/.default",
+    }
+    response = requests.post(url, data=data)
+    response.raise_for_status()
+    return response.json()["access_token"]
+
+
+@st.cache_data(ttl=60)
+def download_excel_from_sharepoint():
+    """SharePoint에서 엑셀 파일 다운로드 -> raw bytes 반환"""
+    try:
+        token = get_access_token()
+        headers = {"Authorization": f"Bearer {token}"}
+        site_name = st.secrets["azure"]["site_name"]
+        file_name = st.secrets["azure"]["file_name"]
+        graph_base = "https://graph.microsoft.com/v1.0"
+
+        # 1) 사이트 ID 조회
+        site_url = f"{graph_base}/sites/gscaltexyeulmaru.sharepoint.com:/sites/{site_name}"
+        site_resp = requests.get(site_url, headers=headers)
+        site_resp.raise_for_status()
+        site_id = site_resp.json()["id"]
+
+        # 2) 드라이브 검색
+        drives_url = f"{graph_base}/sites/{site_id}/drives"
+        drives_resp = requests.get(drives_url, headers=headers)
+        drives_resp.raise_for_status()
+        drives = drives_resp.json().get("value", [])
+
+        target = None
+        target_drive_id = None
+        for drv in drives:
+            drive_id = drv["id"]
+            search_url = f"{graph_base}/drives/{drive_id}/root/search(q='{file_name}')"
+            search_resp = requests.get(search_url, headers=headers)
+            if search_resp.status_code != 200:
+                continue
+            items = search_resp.json().get("value", [])
+            for item in items:
+                if item.get("name") == file_name:
+                    target = item
+                    target_drive_id = drive_id
+                    break
+            if target:
+                break
+
+        if not target:
+            return None
+
+        # 3) downloadUrl로 파일 받기 (Workbook API 사용 안 함)
+        download_url = target.get("@microsoft.graph.downloadUrl")
+        if download_url:
+            file_resp = requests.get(download_url)
+            file_resp.raise_for_status()
+            return file_resp.content
+
+        # fallback: drives/items/content
+        item_id = target["id"]
+        content_url = f"{graph_base}/drives/{target_drive_id}/items/{item_id}/content"
+        file_resp = requests.get(content_url, headers=headers)
+        file_resp.raise_for_status()
+        return file_resp.content
+
+    except Exception:
+        return None
+
+
 def get_excel_data():
-    """운영 엑셀 파일 경로 반환 (로컬 OneDrive 동기화 파일)"""
-    path = find_local_excel_path()
-    if path:
-        return path
-    st.error("운영 엑셀 파일을 찾을 수 없습니다. OneDrive 동기화 상태를 확인해주세요.")
+    """운영 엑셀 파일 경로 또는 BytesIO 반환 (로컬 우선, Cloud fallback)"""
+    # 1. 로컬 파일 우선 (사무실 PC)
+    local_path = find_local_excel_path()
+    if local_path:
+        return local_path
+
+    # 2. SharePoint download (Cloud 환경)
+    raw = download_excel_from_sharepoint()
+    if raw:
+        return io.BytesIO(raw)
+
+    # 3. 둘 다 실패
+    st.error("운영 엑셀 파일을 찾을 수 없습니다.")
     st.stop()
 
 
