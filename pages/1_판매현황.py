@@ -5,7 +5,7 @@ import plotly.express as px
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from utils.data_loader import load_daily_input, load_sales_trend, get_base_date, load_performance_master, load_round_details, get_data_source
+from utils.data_loader import load_daily_input, load_sales_trend, get_base_date, load_performance_master, load_round_details, get_data_source, match_performance, match_performance_category, get_target_occupancy
 from utils.charts import COLORS, apply_common_layout
 
 
@@ -236,19 +236,45 @@ if trend_df is not None and not trend_df.empty and '기준일자' in trend_df.co
             diff = int(last_two.iloc[1]['합계좌석'] - last_two.iloc[0]['합계좌석'])
             daily_diff[perf_name] = diff
 
-# ── 판매중 / 종료 분리 ──
+# ── 판매중 / 종료 분리 (공연마스터 티켓오픈일·종료일 기반) ──
 today = pd.Timestamp.now().normalize()
+
+# grouped에 티켓오픈일, 종료일 병합
+for idx, row in grouped.iterrows():
+    matched_m = match_performance(row['공연명'], master_df)
+    if matched_m is not None:
+        grouped.at[idx, '티켓오픈일'] = pd.to_datetime(matched_m.get('티켓오픈일'), errors='coerce')
+        grouped.at[idx, '종료일'] = pd.to_datetime(matched_m.get('종료일'), errors='coerce')
+    else:
+        grouped.at[idx, '티켓오픈일'] = pd.NaT
+        grouped.at[idx, '종료일'] = pd.NaT
+
+grouped['티켓오픈일'] = pd.to_datetime(grouped['티켓오픈일'], errors='coerce')
+grouped['종료일'] = pd.to_datetime(grouped['종료일'], errors='coerce')
 
 if '공연일(날짜)' in grouped.columns:
     grouped['공연일(날짜)'] = pd.to_datetime(grouped['공연일(날짜)'], errors='coerce')
-    grouped['_days'] = (grouped['공연일(날짜)'] - today).dt.days
+grouped['_days'] = (grouped['공연일(날짜)'] - today).dt.days if '공연일(날짜)' in grouped.columns else None
 
-    active_df = grouped[grouped['_days'] >= 0].sort_values('공연일(날짜)', ascending=True).copy()
-    ended_df = grouped[grouped['_days'] < 0].sort_values('공연일(날짜)', ascending=False).copy()
-else:
-    active_df = grouped.copy()
-    ended_df = pd.DataFrame(columns=grouped.columns)
-    active_df['_days'] = None
+# 판매중: 티켓오픈일 <= today <= 종료일
+_has_dates = grouped['티켓오픈일'].notna() & grouped['종료일'].notna()
+active_mask = _has_dates & (grouped['티켓오픈일'] <= today) & (today <= grouped['종료일'])
+ended_mask = _has_dates & (today > grouped['종료일'])
+notyet_mask = _has_dates & (grouped['티켓오픈일'] > today)
+# 날짜 정보 없는 행은 기존 로직(공연일 기준) fallback
+no_dates_mask = ~_has_dates
+if no_dates_mask.any() and '공연일(날짜)' in grouped.columns:
+    fallback_active = no_dates_mask & (grouped['_days'] >= 0)
+    fallback_ended = no_dates_mask & (grouped['_days'] < 0)
+    active_mask = active_mask | fallback_active
+    ended_mask = ended_mask | fallback_ended
+
+active_df = grouped[active_mask].sort_values('공연일(날짜)', ascending=True).copy() if '공연일(날짜)' in grouped.columns else grouped[active_mask].copy()
+ended_df = grouped[ended_mask].sort_values('공연일(날짜)', ascending=False).copy() if '공연일(날짜)' in grouped.columns else grouped[ended_mask].copy()
+notyet_df = grouped[notyet_mask].copy()
+
+if not notyet_df.empty:
+    st.sidebar.info(f"미오픈 공연 {len(notyet_df)}건: {', '.join(notyet_df['공연명'].tolist())}")
 
 
 # ── 헬퍼 함수 ──
@@ -390,22 +416,10 @@ if not active_df.empty:
 else:
     avg_occ = 0.0
 
-# 상업성/공공성 평균 점유율 계산
-_METRIC_CAT = {
-    '브런치콘서트': '상업성', '100층짜리': '상업성', '100층': '상업성',
-    '실내악': '공공성', '무지쿰': '공공성', '편한 음악': '공공성',
-    '편한음악': '공공성', '국립심포니': '공공성', '페스티발앙상블': '공공성',
-}
-
-def _perf_category(pname):
-    for key, cat in _METRIC_CAT.items():
-        if key in str(pname):
-            return cat
-    return None
-
+# 상업성/공공성 평균 점유율 계산 (공연마스터 기반)
 _comm_occ, _pub_occ = [], []
 for _, r in active_df.iterrows():
-    cat = _perf_category(r['공연명'])
+    cat = match_performance_category(r['공연명'], master_df)
     if cat == '상업성':
         _comm_occ.append(r['점유율'])
     elif cat == '공공성':
@@ -492,29 +506,12 @@ if not active_df.empty:
     # D-day 임박순: 작은 D-day가 위 → Plotly는 아래부터 그리므로 ascending=False
     chart_df = active_df.sort_values('_days', ascending=False).copy()
 
-    # 목표점유율 매칭 (SharePoint 파일에 컬럼이 없을 수 있으므로 코드 레벨 fallback)
-    _TARGET_FALLBACK = {
-        '브런치콘서트': 60, '실내악 페스티벌': 20, '김영욱': 20,
-        '100층짜리': 50, '한국페스티발앙상블': 20, '국립심포니': 20,
-    }
-    chart_df['목표점유율'] = 80.0
+    # 목표점유율 매칭 (공연마스터 기반, fallback=50)
+    chart_df['목표점유율'] = 50.0
     for idx, row in chart_df.iterrows():
-        name = row['공연명']
-        matched = _match_master(name, master_df)
-        target = None
-        # 1차: 공연마스터에서 읽기
-        if matched is not None and pd.notna(matched.get('목표점유율')):
-            val = float(matched['목표점유율'])
-            if val != 80.0:  # 기본값이 아닌 실제 값
-                target = val
-        # 2차: 기본값(80)이면 코드 레벨 매핑으로 override
-        if target is None:
-            for key, fallback in _TARGET_FALLBACK.items():
-                if key in str(name):
-                    target = float(fallback)
-                    break
-        if target is not None:
-            chart_df.at[idx, '목표점유율'] = target
+        target = get_target_occupancy(row['공연명'], master_df)
+        if target is not None and target > 0:
+            chart_df.at[idx, '목표점유율'] = float(target)
 
     chart_df['달성률'] = (chart_df['점유율'] / chart_df['목표점유율'].replace(0, 80) * 100).clip(lower=0)
 
@@ -775,27 +772,10 @@ if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in 
     perf_list = trend_df['공연명'].unique().tolist()
     _default_perfs = [p for p in _active_perf_names if p in perf_list] or perf_list
 
-    # ── 공연 카테고리: 공연마스터 사업구분 → 키워드 fallback ──
-    _CATEGORY_FALLBACK = {
-        '브런치콘서트': '상업성',
-        '100층짜리': '상업성',
-        '실내악': '공공성',
-        '무지쿰': '공공성',
-        '편한 음악': '공공성',
-        '페스티발앙상블': '공공성',
-        '국립심포니': '공공성',
-    }
-
+    # ── 공연 카테고리: 공연마스터 사업구분 기반 ──
     def _get_category(perf_name):
-        # 1차: 키워드 fallback (확실한 매핑 우선)
-        for key, cat in _CATEGORY_FALLBACK.items():
-            if key in str(perf_name):
-                return cat
-        # 2차: 공연마스터 사업구분 컬럼
-        matched_m = _match_master(perf_name, master_df)
-        if matched_m is not None and pd.notna(matched_m.get('사업구분')):
-            return str(matched_m['사업구분']).strip()
-        return '공공성'
+        cat = match_performance_category(perf_name, master_df)
+        return cat if cat else '공공성'
 
     _commercial = [p for p in _default_perfs if _get_category(p) == '상업성']
     _public = [p for p in _default_perfs if _get_category(p) == '공공성']
@@ -953,23 +933,10 @@ if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in 
             if not _p_trend.empty:
                 _ticket_open_map[pname] = pd.to_datetime(_p_trend['기준일자'], errors='coerce').min()
 
-    # ── 목표 점유율 매핑 ──
-    _TARGET_OCCUPANCY = {
-        '브런치콘서트': 60,
-        '100층짜리': 50,
-        '100층': 50,
-        '실내악': 20,
-        '무지쿰': 20,
-        '편한 음악': 20,
-        '편한음악': 20,
-        '국립심포니': 20,
-    }
-
+    # ── 목표 점유율 매핑 (공연마스터 기반) ──
     def _get_target_occ(pname):
-        for key, val in _TARGET_OCCUPANCY.items():
-            if key in str(pname):
-                return val
-        return None
+        val = get_target_occupancy(pname, master_df)
+        return val if val and val > 0 else None
 
     # ── 영역4: 차트 ──
     def _render_chart(container, title, cat_perfs, color_map):

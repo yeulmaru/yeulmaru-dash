@@ -165,6 +165,87 @@ def load_performance_master():
         return None
 
 
+
+
+def get_active_performances(master_df, today=None):
+    """판매중 공연 필터링.
+    조건: 상태==판매중 AND 티켓오픈일 <= today <= 종료일 (날짜 없으면 상태만으로 판단).
+
+    Args:
+        master_df: load_performance_master() 결과
+        today: 기준일 (기본값 오늘)
+
+    Returns:
+        판매중 공연만 필터링된 DataFrame
+    """
+    if master_df is None or master_df.empty:
+        return pd.DataFrame()
+    if today is None:
+        today = pd.Timestamp.now().normalize()
+    else:
+        today = pd.Timestamp(today)
+
+    df = master_df.copy()
+
+    # 1차: 상태 컬럼 필터
+    if '상태' in df.columns:
+        df = df[df['상태'].astype(str).str.strip() == '판매중']
+
+    # 2차: 날짜 범위 필터 (컬럼 있을 때만)
+    if '종료일' in df.columns:
+        end = pd.to_datetime(df['종료일'], errors='coerce')
+        df = df[end.isna() | (end >= today)]
+    if '티켓오픈일' in df.columns:
+        open_dt = pd.to_datetime(df['티켓오픈일'], errors='coerce')
+        df = df[open_dt.isna() | (open_dt <= today)]
+
+    return df.reset_index(drop=True)
+
+
+def match_performance(perf_name, master_df):
+    """공연명으로 공연마스터 행 매칭 (contains 양방향).
+
+    Args:
+        perf_name: 검색할 공연명 문자열
+        master_df: load_performance_master() 결과
+
+    Returns:
+        매칭된 Series (행) 또는 None
+    """
+    if master_df is None or master_df.empty:
+        return None
+    perf_name_s = str(perf_name).strip()
+    for _, row in master_df.iterrows():
+        master_name = str(row['사업명']).strip()
+        if perf_name_s == master_name or perf_name_s in master_name or master_name in perf_name_s:
+            return row
+    return None
+
+
+def match_performance_category(perf_name, master_df):
+    """공연명으로 공연마스터에서 사업구분(상업성/공공성) 찾기.
+
+    Returns:
+        '상업성' or '공공성' or None
+    """
+    matched = match_performance(perf_name, master_df)
+    if matched is not None and pd.notna(matched.get('사업구분')):
+        return str(matched['사업구분']).strip()
+    return None
+
+
+def get_target_occupancy(perf_name, master_df):
+    """공연명으로 공연마스터에서 목표점유율 찾기.
+
+    Returns:
+        int (예: 20, 50, 60) or None
+    """
+    matched = match_performance(perf_name, master_df)
+    if matched is not None and pd.notna(matched.get('목표점유율')):
+        val = int(matched['목표점유율'])
+        return val
+    return None
+
 @st.cache_data(ttl=60)
 def load_round_details():
     """회차상세 시트를 읽어서 DataFrame 반환"""
@@ -487,6 +568,197 @@ def write_daily_entries_to_sharepoint(entries):
     except Exception as e:
         return False, f"SharePoint 쓰기 실패: {e}"
 
+
+
+
+def find_existing_row(base_url, headers, ws_id, date_int, perf_name, round_time):
+    """누적기록(row16~)에서 기준일자+공연명+회차시각 매칭 행 탐색.
+    Returns: int(1-based row) or None"""
+    import re as _re
+    url = f"{base_url}/worksheets/{ws_id}/usedRange"
+    resp = requests.get(url, headers=headers)
+    resp.raise_for_status()
+    data = resp.json()
+
+    addr = data.get("address", "")
+    start_row = 1
+    if "!" in addr:
+        m = _re.search(r'(\d+)', addr.split("!")[1])
+        if m:
+            start_row = int(m.group(1))
+
+    values = data.get("values", [])
+    formulas = data.get("formulas", [])
+
+    for i in range(len(values)):
+        row_vals = values[i]
+        if len(row_vals) < 4:
+            continue
+        cell_a = row_vals[0]
+        cell_b = str(row_vals[1]).strip() if row_vals[1] else ""
+        cell_d = str(row_vals[3]).strip().lstrip("'") if row_vals[3] else ""
+
+        # 수식 행 건너뛰기
+        if formulas and i < len(formulas):
+            fa = str(formulas[i][0]) if formulas[i][0] else ""
+            if fa.startswith("="):
+                continue
+
+        try:
+            val_a = int(float(cell_a))
+        except (ValueError, TypeError):
+            continue
+
+        if val_a != date_int:
+            continue
+
+        # 공연명 매칭 (contains 양방향)
+        perf_s = str(perf_name).strip()
+        name_match = (cell_b == perf_s or perf_s in cell_b or cell_b in perf_s)
+        if not name_match:
+            continue
+
+        # 회차시각 매칭 (빈 값이면 무조건 매칭)
+        rt = str(round_time).strip().lstrip("'") if round_time else ""
+        if rt and cell_d and rt != cell_d:
+            continue
+
+        return start_row + i
+
+    return None
+
+
+def save_daily_entry(
+    date_int, perf_name, perf_date_str, round_time, open_seats,
+    paid_seats, paid_amount, rsv_seats, rsv_amount, free_seats,
+    prev_seats=0, prev_amount=0,
+):
+    """일일입력 시트 누적기록에 1행 저장 (UPDATE or INSERT).
+
+    Args:
+        date_int: 기준일자 (yyyymmdd int)
+        perf_name: 공연명
+        perf_date_str: 공연일 문자열 ("2026. 5. 7(목)")
+        round_time: 회차/시각 ("19:30")
+        open_seats: 오픈석
+        paid_seats, paid_amount: 유료좌석, 유료금액
+        rsv_seats, rsv_amount: 예약좌석, 예약금액
+        free_seats: 무료좌석
+        prev_seats, prev_amount: 전일 합계좌석/금액 (전일대비 계산용)
+
+    Returns:
+        dict: {status, row, message}
+    """
+    from datetime import datetime as _dt
+
+    total_seats = paid_seats + rsv_seats + free_seats
+    total_amount = paid_amount + rsv_amount
+    occupancy = min(total_seats / open_seats, 1.0) if open_seats > 0 else 0
+    unit_price = round(total_amount / total_seats) if total_seats > 0 else 0
+    diff_seats = total_seats - prev_seats
+    diff_amount = total_amount - prev_amount
+    now_time = _dt.now().strftime('%H:%M:%S')
+
+    row_data = [
+        date_int,                        # A: 기준일자
+        perf_name,                       # B: 공연명
+        perf_date_str,                   # C: 공연일
+        "'" + round_time if round_time else '',  # D: 회차/시각
+        open_seats,                      # E: 오픈석
+        paid_seats,                      # F: 유료좌석
+        paid_amount,                     # G: 유료금액
+        rsv_seats,                       # H: 예약좌석
+        rsv_amount,                      # I: 예약금액
+        free_seats,                      # J: 무료좌석
+        total_seats,                     # K: 합계좌석
+        total_amount,                    # L: 합계금액
+        round(occupancy, 4),             # M: 점유율
+        diff_seats,                      # N: 전일대비(석)
+        diff_amount,                     # O: 전일대비(원)
+        unit_price,                      # P: 객단가
+        "",                              # Q: 중복체크
+        now_time,                        # R: 갱신시각
+    ]
+
+    try:
+        drive_id, file_item_id = _get_sharepoint_file_meta()
+        token = get_access_token()
+        hdrs = {
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/json",
+        }
+        graph_base = "https://graph.microsoft.com/v1.0"
+        base_url = f"{graph_base}/drives/{drive_id}/items/{file_item_id}/workbook"
+
+        # 워크시트 ID
+        ws_resp = requests.get(f"{base_url}/worksheets", headers=hdrs)
+        ws_resp.raise_for_status()
+        ws_id = None
+        for ws in ws_resp.json().get("value", []):
+            if ws["name"] == "일일입력":
+                ws_id = ws["id"]
+                break
+        if not ws_id:
+            return {"status": "error", "row": None, "message": "일일입력 워크시트를 찾을 수 없습니다."}
+
+        # 기존 행 탐색
+        existing_row = find_existing_row(base_url, hdrs, ws_id, date_int, perf_name, round_time)
+
+        if existing_row:
+            # UPDATE: 기존 행 덮어쓰기
+            address = f"A{existing_row}:R{existing_row}"
+            patch_url = f"{base_url}/worksheets/{ws_id}/range(address='{address}')"
+            resp = requests.patch(patch_url, headers=hdrs, json={"values": [row_data]})
+            if resp.status_code == 200:
+                _clear_caches()
+                return {"status": "updated", "row": existing_row,
+                        "message": f"행 {existing_row} 갱신 완료 ({now_time})"}
+            else:
+                err = resp.json().get("error", {}).get("message", resp.text[:300])
+                return {"status": "error", "row": existing_row,
+                        "message": f"갱신 실패 ({resp.status_code}): {err}"}
+        else:
+            # INSERT: 새 행 추가
+            last_row = _find_last_literal_data_row(base_url, hdrs, ws_id)
+            insert_start = last_row + 1
+            address = f"A{insert_start}:R{insert_start}"
+
+            # 행 삽입
+            insert_url = f"{base_url}/worksheets/{ws_id}/range(address='{address}')/insert"
+            ins_resp = requests.post(insert_url, headers=hdrs, json={"shift": "Down"})
+            if ins_resp.status_code != 200:
+                err = ins_resp.json().get("error", {}).get("message", ins_resp.text[:300])
+                return {"status": "error", "row": None,
+                        "message": f"행 삽입 실패 ({ins_resp.status_code}): {err}"}
+
+            # 데이터 쓰기
+            patch_url = f"{base_url}/worksheets/{ws_id}/range(address='{address}')"
+            resp = requests.patch(patch_url, headers=hdrs, json={"values": [row_data]})
+            if resp.status_code == 200:
+                _clear_caches()
+                return {"status": "inserted", "row": insert_start,
+                        "message": f"행 {insert_start} 신규 저장 ({now_time})"}
+            else:
+                err = resp.json().get("error", {}).get("message", resp.text[:300])
+                return {"status": "error", "row": None,
+                        "message": f"데이터 쓰기 실패 ({resp.status_code}): {err}"}
+
+    except FileNotFoundError as e:
+        return {"status": "error", "row": None, "message": str(e)}
+    except Exception as e:
+        return {"status": "error", "row": None, "message": f"저장 실패: {e}"}
+
+
+def _clear_caches():
+    """모든 데이터 캐시 초기화"""
+    try:
+        load_daily_input.clear()
+        load_sales_trend.clear()
+        get_base_date.clear()
+        download_excel_from_sharepoint.clear()
+        load_performance_master.clear()
+    except Exception:
+        pass
 
 @st.cache_data(ttl=60)
 def load_yearly_performance():
