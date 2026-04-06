@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 from datetime import date, datetime
+import time
 
 from utils.data_loader import (
     load_performance_master,
@@ -41,13 +42,7 @@ if master_df is None or master_df.empty:
 # ── 페이지 상단 ──
 st.title("📝 일일 판매현황 입력")
 
-# 저장 결과 표시 (에러는 persistent, 성공은 toast 팝업)
-for sr in st.session_state.save_results:
-    if sr['status'] == 'error':
-        st.error(f"❌ {sr['perf']}: {sr['message']}")
-    else:
-        st.toast(f"✅ {sr['perf']}: {sr['message']}", icon="✅")
-st.session_state.save_results = []
+# (저장 결과는 각 카드 내부에서 표시됨 - 아래 카드 렌더링 참조)
 
 # 미저장 경고 배너
 if st.session_state.has_unsaved_changes:
@@ -258,6 +253,7 @@ def _do_save_perf(perf, perf_rounds_info, round_results, prev):
             prev_amount=prev_amount,
         )
         res['perf'] = perf_name
+        res['ts'] = time.time()
         results.append(res)
     else:
         # 단일회차
@@ -281,6 +277,7 @@ def _do_save_perf(perf, perf_rounds_info, round_results, prev):
             prev_amount=prev_amount,
         )
         res['perf'] = perf_name
+        res['ts'] = time.time()
         results.append(res)
 
     return results
@@ -484,6 +481,15 @@ for card_idx, (_, perf) in enumerate(active_df.iterrows()):
                 else:
                     st.rerun()
 
+        # ── 카드 저장 결과 표시 (자기 카드만, 5초 이내) ──
+        _now = time.time()
+        for sr in st.session_state.save_results:
+            if sr.get('perf') == perf_name and (_now - sr.get('ts', 0)) < 5:
+                if sr['status'] == 'error':
+                    st.error(f"❌ {sr['message']}")
+                else:
+                    st.success(f"✅ {sr['message']}")
+
         # 카드 데이터 수집 (전체 저장용)
         all_cards.append({
             'perf': perf,
@@ -547,3 +553,10 @@ else:
         '입력된 데이터가 없습니다. 위 카드에서 판매 데이터를 입력해주세요.</div>',
         unsafe_allow_html=True,
     )
+
+# 5초 이상 지난 저장 결과는 제거 (메모리 정리)
+_now = time.time()
+st.session_state.save_results = [
+    sr for sr in st.session_state.save_results
+    if (_now - sr.get('ts', 0)) < 5
+]
