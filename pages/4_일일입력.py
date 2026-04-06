@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 from datetime import date, datetime
 import time
+import re
 
 from utils.data_loader import (
     load_performance_master,
@@ -42,6 +43,35 @@ if master_df is None or master_df.empty:
 # ── 페이지 상단 ──
 st.title("📝 일일 판매현황 입력")
 
+# 저장 버튼 커스텀 스타일 (검정 배경 + No Mute green)
+st.markdown("""
+<style>
+div.stButton > button[kind="primary"] {
+    background-color: #0a0a0a;
+    color: #0FFD02;
+    border: 1px solid #0FFD02;
+    font-weight: 600;
+    transition: all 0.2s ease;
+}
+div.stButton > button[kind="primary"]:hover {
+    background-color: #151515;
+    box-shadow: 0 0 14px rgba(15, 253, 2, 0.4);
+    border-color: #0FFD02;
+    color: #0FFD02;
+    transform: translateY(-1px);
+}
+div.stButton > button[kind="primary"]:active {
+    background-color: #1a1a1a;
+    transform: translateY(0);
+    box-shadow: 0 0 8px rgba(15, 253, 2, 0.3);
+}
+div.stButton > button[kind="primary"]:focus:not(:active) {
+    color: #0FFD02;
+    border-color: #0FFD02;
+}
+</style>
+""", unsafe_allow_html=True)
+
 # (저장 결과는 각 카드 내부에서 표시됨 - 아래 카드 렌더링 참조)
 
 # 미저장 경고 배너
@@ -55,6 +85,12 @@ date_int = int(base_date.strftime('%Y%m%d'))
 
 # ── 판매중 공연 목록 ──
 active_df = get_active_performances(master_df, today=today)
+
+# 시작일 가까운 순 (오름차순) 정렬
+if not active_df.empty and '시작일' in active_df.columns:
+    active_df = active_df.copy()
+    active_df['_start_dt'] = pd.to_datetime(active_df['시작일'], errors='coerce')
+    active_df = active_df.sort_values('_start_dt', na_position='last').drop(columns=['_start_dt']).reset_index(drop=True)
 
 if active_df.empty:
     st.info("현재 판매중인 공연이 없습니다.")
@@ -168,17 +204,15 @@ def _sess_key(perf_id, round_no):
     return f"input_{perf_id}_{round_no}"
 
 
-# ── 입력 필드 렌더링 ──
+# ── 입력 필드 렌더링 (예약 필드 제거: 유료/무료만) ──
 def _render_input_row(perf_id, round_no, seat_capacity, cols_spec, prefill=None):
     sk = _sess_key(perf_id, round_no)
     pf = prefill or {}
     def_paid_s = pf.get('유료좌석', 0)
     def_paid_a = pf.get('유료금액', 0)
-    def_rsv_s = pf.get('예약좌석', 0)
-    def_rsv_a = pf.get('예약금액', 0)
     def_free = pf.get('무료좌석', 0)
 
-    c1, c2, c3, c4, c5 = cols_spec
+    c1, c2, c3 = cols_spec
     with c1:
         paid_s = st.number_input("유료좌석", min_value=0, value=def_paid_s,
                                   step=1, key=f"{sk}_ps", label_visibility="collapsed")
@@ -186,26 +220,20 @@ def _render_input_row(perf_id, round_no, seat_capacity, cols_spec, prefill=None)
         paid_a = st.number_input("유료금액", min_value=0, value=def_paid_a,
                                   step=1000, key=f"{sk}_pa", label_visibility="collapsed")
     with c3:
-        rsv_s = st.number_input("예약좌석", min_value=0, value=def_rsv_s,
-                                 step=1, key=f"{sk}_rs", label_visibility="collapsed")
-    with c4:
-        rsv_a = st.number_input("예약금액", min_value=0, value=def_rsv_a,
-                                 step=1000, key=f"{sk}_ra", label_visibility="collapsed")
-    with c5:
         free_s = st.number_input("무료좌석", min_value=0, value=def_free,
                                   step=1, key=f"{sk}_fr", label_visibility="collapsed")
 
-    total_seats = paid_s + rsv_s + free_s
-    total_amount = paid_a + rsv_a
+    total_seats = paid_s + free_s
+    total_amount = paid_a
     occ = min(total_seats / seat_capacity * 100, 100.0) if seat_capacity > 0 else 0.0
-    has_input = (paid_s + paid_a + rsv_s + rsv_a + free_s) > 0
+    has_input = (paid_s + paid_a + free_s) > 0
 
     if has_input:
         st.session_state.has_unsaved_changes = True
 
     return {
         '유료좌석': paid_s, '유료금액': paid_a,
-        '예약좌석': rsv_s, '예약금액': rsv_a,
+        '예약좌석': 0, '예약금액': 0,
         '무료좌석': free_s,
         '합계좌석': total_seats, '합계금액': total_amount,
         '점유율': occ, 'has_input': has_input,
@@ -357,19 +385,17 @@ for card_idx, (_, perf) in enumerate(active_df.iterrows()):
         round_results = []
 
         if total_rounds > 1 and perf_rounds_info:
-            _h = st.columns([0.4, 0.9, 0.6, 0.8, 0.8, 0.8, 0.8, 0.8])
+            _h = st.columns([0.4, 0.9, 0.6, 0.8, 0.8, 0.8])
             _h[0].markdown("**#**")
             _h[1].markdown("**공연일/시각**")
             _h[2].markdown("**가용석**")
             _h[3].markdown("**유료좌석**")
             _h[4].markdown("**유료금액**")
-            _h[5].markdown("**예약좌석**")
-            _h[6].markdown("**예약금액**")
-            _h[7].markdown("**무료좌석**")
+            _h[5].markdown("**무료좌석**")
 
             for rd_info in perf_rounds_info:
                 rn = rd_info['round_no']
-                cols = st.columns([0.4, 0.9, 0.6, 0.8, 0.8, 0.8, 0.8, 0.8])
+                cols = st.columns([0.4, 0.9, 0.6, 0.8, 0.8, 0.8])
                 with cols[0]:
                     st.markdown(f"`{rn}`")
                 with cols[1]:
@@ -379,7 +405,7 @@ for card_idx, (_, perf) in enumerate(active_df.iterrows()):
 
                 result = _render_input_row(
                     perf_id, rn, rd_info['seat'],
-                    (cols[3], cols[4], cols[5], cols[6], cols[7]),
+                    (cols[3], cols[4], cols[5]),
                 )
                 round_results.append(result)
 
@@ -398,17 +424,15 @@ for card_idx, (_, perf) in enumerate(active_df.iterrows()):
                 st.markdown(f"**시각** {ri['date']} {ri['time']} &nbsp;&nbsp; **가용석** {ri['seat']:,}석")
             st.markdown("")
 
-            _h = st.columns(5)
+            _h = st.columns(3)
             _h[0].markdown("**유료좌석**")
             _h[1].markdown("**유료금액**")
-            _h[2].markdown("**예약좌석**")
-            _h[3].markdown("**예약금액**")
-            _h[4].markdown("**무료좌석**")
+            _h[2].markdown("**무료좌석**")
 
-            input_cols = st.columns(5)
+            input_cols = st.columns(3)
             result = _render_input_row(
                 perf_id, 1, base_seat,
-                (input_cols[0], input_cols[1], input_cols[2], input_cols[3], input_cols[4]),
+                (input_cols[0], input_cols[1], input_cols[2]),
                 prefill=today_pf,
             )
             round_results.append(result)
@@ -475,6 +499,11 @@ for card_idx, (_, perf) in enumerate(active_df.iterrows()):
                     st.session_state.save_results.append(sr)
 
                 if all(sr['status'] != 'error' for sr in save_res):
+                    # 이 카드의 입력 필드 session_state 초기화
+                    _prefix = f"input_{perf_id}_"
+                    for _k in list(st.session_state.keys()):
+                        if _k.startswith(_prefix):
+                            del st.session_state[_k]
                     st.session_state.has_unsaved_changes = False
                     st.cache_data.clear()
                     st.rerun()
@@ -488,7 +517,9 @@ for card_idx, (_, perf) in enumerate(active_df.iterrows()):
                 if sr['status'] == 'error':
                     st.error(f"❌ {sr['message']}")
                 else:
-                    st.success(f"✅ {sr['message']}")
+                    _m = re.search(r'\((\d{2}:\d{2}:\d{2})\)', sr.get('message', ''))
+                    _ts = _m.group(1) if _m else ''
+                    st.success(f"✅ {perf_name} 공연 실시간 정보 갱신 완료 ({_ts})")
 
         # 카드 데이터 수집 (전체 저장용)
         all_cards.append({
@@ -544,6 +575,13 @@ if has_any:
 
             st.session_state.save_results = all_results
             if all(r['status'] != 'error' for r in all_results):
+                # 성공한 카드들의 입력 필드 초기화
+                for _c in input_cards:
+                    _pid = _c['perf']['ID']
+                    _prefix = f"input_{_pid}_"
+                    for _k in list(st.session_state.keys()):
+                        if _k.startswith(_prefix):
+                            del st.session_state[_k]
                 st.session_state.has_unsaved_changes = False
                 st.cache_data.clear()
             st.rerun()
