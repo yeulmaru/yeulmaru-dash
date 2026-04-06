@@ -141,7 +141,7 @@ def _load_today_data(trend_df, base_date_ts):
     for _, r in today_df.iterrows():
         name = str(r['공연명']).strip()
         entry = {}
-        for col in ['유료좌석', '유료금액', '예약좌석', '예약금액', '무료좌석',
+        for col in ['유료좌석', '유료금액', '무료좌석',
                      '합계좌석', '합계금액']:
             if col in r.index and pd.notna(r[col]):
                 entry[col] = int(r[col])
@@ -274,7 +274,6 @@ def _render_input_row(perf_id, round_no, seat_capacity, cols_spec, prefill=None)
 
     return {
         '유료좌석': paid_s, '유료금액': paid_a,
-        '예약좌석': 0, '예약금액': 0,
         '무료좌석': free_s,
         '합계좌석': total_seats, '합계금액': total_amount,
         '점유율': occ, 'has_input': has_input,
@@ -304,8 +303,6 @@ def _do_save_perf(perf, perf_rounds_info, round_results, prev, current=None):
         # 다회차: 전체 합산 1행으로 저장 (current + input)
         agg_paid_s = cur_paid_s + sum(r['유료좌석'] for r in round_results)
         agg_paid_a = cur_paid_a + sum(r['유료금액'] for r in round_results)
-        agg_rsv_s = sum(r['예약좌석'] for r in round_results)
-        agg_rsv_a = sum(r['예약금액'] for r in round_results)
         agg_free = cur_free + sum(r['무료좌석'] for r in round_results)
 
         # 공연일/시각: 첫 회차 정보
@@ -321,8 +318,6 @@ def _do_save_perf(perf, perf_rounds_info, round_results, prev, current=None):
             open_seats=total_open,
             paid_seats=agg_paid_s,
             paid_amount=agg_paid_a,
-            rsv_seats=agg_rsv_s,
-            rsv_amount=agg_rsv_a,
             free_seats=agg_free,
             prev_seats=prev_seats,
             prev_amount=prev_amount,
@@ -345,8 +340,6 @@ def _do_save_perf(perf, perf_rounds_info, round_results, prev, current=None):
             open_seats=base_seat,
             paid_seats=cur_paid_s + r['유료좌석'],
             paid_amount=cur_paid_a + r['유료금액'],
-            rsv_seats=r['예약좌석'],
-            rsv_amount=r['예약금액'],
             free_seats=cur_free + r['무료좌석'],
             prev_seats=prev_seats,
             prev_amount=prev_amount,

@@ -121,8 +121,8 @@ def match_performance_category(perf_name, master_df):
         '상업성' or '공공성' or None
     """
     matched = match_performance(perf_name, master_df)
-    if matched is not None and pd.notna(matched.get('사업구분')):
-        return str(matched['사업구분']).strip()
+    if matched is not None and pd.notna(matched.get('수익성')):
+        return str(matched['수익성']).strip()
     return None
 
 
@@ -176,16 +176,12 @@ def load_daily_input():
     if not source:
         return None
     try:
-        df = pd.read_excel(source, sheet_name='일일입력', skiprows=3)
-        if 'No' in df.columns:
-            df = df[pd.to_numeric(df['No'], errors='coerce').notnull()].copy()
-
-        # 공연일(시작) 컬럼 자동 감지
-        for col in df.columns:
-            col_str = str(col)
-            if '공연' in col_str and '시작' in col_str:
-                df[col] = pd.to_datetime(df[col], errors='coerce')
-
+        df = pd.read_excel(source, sheet_name='일일입력', skiprows=15)
+        df = df.loc[:, ~df.columns.str.startswith('Unnamed')]
+        df = df.dropna(subset=['기준일자', '공연명']).copy()
+        df['기준일자'] = pd.to_numeric(df['기준일자'], errors='coerce')
+        df = df[df['기준일자'].between(20000000, 30000000)]
+        df['_sort_key'] = range(len(df))
         return df
     except Exception as e:
         st.error(f"`일일입력` 데이터 로드 오류: {e}")
@@ -297,3 +293,57 @@ def load_detailed_management():
     except Exception as e:
         st.error(f"`세부운영관리대장(정리)` 데이터 로드 오류: {e}")
         return None
+
+@st.cache_data(ttl=60)
+def load_combined_performance():
+    """일일입력 누적기록 + 세부운영관리대장 UNION.
+
+    두 소스를 공통 컬럼으로 통일해 하나의 DataFrame으로 반환.
+    일일입력 데이터는 데이터유형='일일입력', 과거 데이터는 '종료시최종'.
+    """
+    # 1. 일일입력 누적기록
+    daily = load_daily_input()
+    if daily is not None:
+        daily = daily.copy()
+        if '데이터유형' not in daily.columns:
+            daily['데이터유형'] = '일일입력'
+    else:
+        daily = pd.DataFrame()
+
+    # 2. 세부운영관리대장
+    detail = load_detailed_management()
+    if detail is not None:
+        detail = detail.copy()
+        # 컬럼 매핑: 세부운영관리대장 → 공통 스키마
+        col_map = {}
+        for col in detail.columns:
+            cs = str(col).replace('\n', '')
+            if '공연' in cs and '명' in cs:
+                col_map[col] = '공연명'
+            elif '세부' in cs and '장르' in cs:
+                col_map[col] = '세부장르'
+            elif '사업' in cs and '구분' in cs:
+                col_map[col] = '사업구분'
+            elif '공연' in cs and '구분' in cs:
+                col_map[col] = '공연구분'
+        detail = detail.rename(columns=col_map)
+        detail['데이터유형'] = '종료시최종'
+    else:
+        detail = pd.DataFrame()
+
+    # 3. UNION (공통 컬럼만)
+    common_cols = ['공연명', '데이터유형']
+    for c in ['세부장르', '사업구분', '공연구분', '장르1', '상태']:
+        if c in daily.columns or (not detail.empty and c in detail.columns):
+            common_cols.append(c)
+
+    frames = []
+    for df in [daily, detail]:
+        if not df.empty:
+            available = [c for c in common_cols if c in df.columns]
+            frames.append(df[available])
+
+    if frames:
+        combined = pd.concat(frames, ignore_index=True)
+        return combined
+    return pd.DataFrame()

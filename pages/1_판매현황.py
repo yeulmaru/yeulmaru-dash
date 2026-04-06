@@ -71,7 +71,7 @@ if '공연명' not in daily_df.columns:
     st.warning("데이터에 '공연명' 컬럼이 없습니다.")
     st.stop()
 
-daily_df['_sort_key'] = pd.to_numeric(daily_df['No'], errors='coerce')
+daily_df['_sort_key'] = range(len(daily_df))
 
 # ── 공연마스터 · 회차상세 로드 ──
 master_df = load_performance_master()
@@ -127,9 +127,7 @@ def _fmt_perf_dates(dates):
     return ', '.join(parts)
 
 
-# 당일 데이터(No < 100)
-today_rows = daily_df[daily_df['_sort_key'] < 100]
-
+# 공연별 최신 행 (누적기록에서 마지막)
 grouped = daily_df.sort_values('_sort_key').groupby('공연명').last().reset_index()
 
 # 공연일(날짜) 컬럼을 datetime으로 통일 (수식 셀이 str/nan 혼재 → dtype 충돌 방지)

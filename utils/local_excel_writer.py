@@ -144,9 +144,9 @@ def _find_matching_row(ws, header_row, date_int, perf_name, round_time):
 
 def save_daily_entry_local(
     date_int, perf_name, perf_date_str, round_time,
-    open_seats, paid_seats, paid_amount,
-    rsv_seats, rsv_amount, free_seats,
+    open_seats, paid_seats, paid_amount, free_seats,
     prev_seats=0, prev_amount=0,
+    data_type='일일입력',
 ):
     """일일입력 시트 누적기록에 1행 저장 (로컬 파일 직접 쓰기).
 
@@ -157,8 +157,8 @@ def save_daily_entry_local(
         dict: {status: 'updated'|'inserted'|'error', row: int|None, message: str}
     """
     # 1. 계산
-    total_seats = paid_seats + rsv_seats + free_seats
-    total_amount = paid_amount + rsv_amount
+    total_seats = paid_seats + free_seats
+    total_amount = paid_amount
     occupancy = min(total_seats / open_seats, 1.0) if open_seats > 0 else 0
     unit_price = round(total_amount / total_seats) if total_seats > 0 else 0
     diff_seats = total_seats - prev_seats
@@ -178,7 +178,7 @@ def save_daily_entry_local(
             ),
         }
 
-    # 3. 데이터 행 구성 (A~R, 18컬럼)
+    # 3. 데이터 행 구성 (A~Q, 17컬럼)
     row_data = [
         date_int,                                      # A: 기준일자
         perf_name,                                     # B: 공연명
@@ -187,17 +187,16 @@ def save_daily_entry_local(
         open_seats,                                    # E: 오픈석
         paid_seats,                                    # F: 유료좌석
         paid_amount,                                   # G: 유료금액
-        rsv_seats,                                     # H: 예약좌석
-        rsv_amount,                                    # I: 예약금액
-        free_seats,                                    # J: 무료좌석
-        total_seats,                                   # K: 합계좌석
-        total_amount,                                  # L: 합계금액
-        round(occupancy, 4),                           # M: 점유율
-        diff_seats,                                    # N: 전일대비(석)
-        diff_amount,                                   # O: 전일대비(원)
-        unit_price,                                    # P: 객단가
-        "",                                            # Q: 중복체크
-        now_time,                                      # R: 갱신시각
+        free_seats,                                    # H: 무료좌석
+        total_seats,                                   # I: 합계좌석
+        total_amount,                                  # J: 합계금액
+        round(occupancy, 4),                           # K: 점유율
+        diff_seats,                                    # L: 전일대비(석)
+        diff_amount,                                   # M: 전일대비(원)
+        unit_price,                                    # N: 객단가
+        "",                                            # O: 중복체크
+        now_time,                                      # P: 갱신시각
+        data_type,                                     # Q: 데이터유형
     ]
 
     # 4. 파일 열기
