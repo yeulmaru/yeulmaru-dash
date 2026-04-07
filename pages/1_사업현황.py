@@ -15,7 +15,7 @@ def get_contrast_text_color(hex_color):
     luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
     return "#000000" if luminance > 0.5 else "#FFFFFF"
 
-st.set_page_config(page_title="실시간 판매현황", page_icon="📊", layout="wide")
+st.set_page_config(page_title="사업현황", page_icon="📊", layout="wide")
 
 from utils.auth import check_password
 check_password()
