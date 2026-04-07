@@ -120,12 +120,21 @@ if detail_df is not None and not detail_df.empty:
             if pd.notna(d) else ''
         )
 
+        _GENRE_COLORS = {
+            '클래식': '#0FFD02',
+            '뮤지컬': '#FF00FF',
+            '대중': '#00FFFF',
+            '발레/연극': '#FFFF00',
+            '어린이': '#FF6EC7',
+            '기타': '#B0B0B0',
+        }
         _s1_fig = px.scatter(
             _s1_grouped,
             x='_월위치',
             y='_평균점유율',
+            color='_장르',
             custom_data=['공연명', '_장르', '_날짜포맷', '_유료합계', '_평균점유율'],
-            color_discrete_sequence=['#0FFD02'],
+            color_discrete_map=_GENRE_COLORS,
         )
         _s1_fig.update_traces(
             marker=dict(size=10, opacity=0.7, line=dict(width=1, color='#FFFFFF')),
@@ -139,18 +148,40 @@ if detail_df is not None and not detail_df.empty:
         )
         _s1_fig.update_layout(
             xaxis=dict(
-                title='월',
+                title='',
                 tickmode='array',
                 tickvals=list(range(1, 13)),
                 ticktext=[f'{m}월' for m in range(1, 13)],
                 range=[0.5, 12.5],
             ),
             yaxis=dict(
-                title='유료점유율(%)',
+                title='',
                 range=[0, 110],
             ),
             height=500,
-            showlegend=False,
+            margin=dict(t=40),
+            showlegend=True,
+            legend=dict(
+                orientation='h',
+                yanchor='top',
+                y=-0.12,
+                xanchor='center',
+                x=0.5,
+                font=dict(color='#FFFFFF'),
+                bgcolor='rgba(0,0,0,0)',
+                title_text='',
+            ),
+            annotations=[dict(
+                text='(%)',
+                x=0,
+                y=1.04,
+                xref='paper',
+                yref='paper',
+                showarrow=False,
+                xanchor='left',
+                yanchor='bottom',
+                font=dict(color='#FFFFFF', size=13),
+            )],
         )
         _s1_fig = apply_common_layout(_s1_fig)
         st.plotly_chart(_s1_fig, use_container_width=True)
