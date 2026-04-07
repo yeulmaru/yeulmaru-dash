@@ -40,13 +40,13 @@ if detail_df is not None and not detail_df.empty:
     _s1_df['기본\n좌석'] = pd.to_numeric(_s1_df['기본\n좌석'], errors='coerce')
     _s1_df = _s1_df[_s1_df['기본\n좌석'] > 0]
 
-    # 점유율 계산
+    # 회차별 점유율
     _s1_df['_점유율'] = _s1_df['발권\n유료'] / _s1_df['기본\n좌석'] * 100
 
     # 연도 int 변환
     _s1_df['_년도'] = _s1_df['년도'].astype(int)
 
-    # 월/일 컬럼 suffix 제거 ('1월'→'1', '26일'→'26')
+    # 월/일 suffix 제거
     _s1_df['월'] = _s1_df['월'].astype(str).str.replace('월', '', regex=False).str.strip()
     _s1_df['일'] = _s1_df['일'].astype(str).str.replace('일', '', regex=False).str.strip()
 
@@ -59,29 +59,53 @@ if detail_df is not None and not detail_df.empty:
     )
     _s1_df = _s1_df.dropna(subset=['_날짜'])
 
-    # 호버용 날짜 포맷
-    _weekday_kr = ['월', '화', '수', '목', '금', '토', '일']
-    _s1_df['_날짜포맷'] = _s1_df['_날짜'].apply(
-        lambda d: f"'{d.year % 100:02d}.{d.month:02d}.{d.day:02d}({_weekday_kr[d.weekday()]})"
-        if pd.notna(d) else ''
-    )
+    # 공연구분 컬럼
+    _s1_perf_type_col = '공연\n구분' if '공연\n구분' in _s1_df.columns else None
 
-    # X축 월 위치
-    _s1_df['_월위치'] = _s1_df['_날짜'].dt.month + (_s1_df['_날짜'].dt.day - 1) / 31
-
-    # 연도 선택
+    # ── 연도 선택 (기본값: 전년도) ──
     _s1_available_years = sorted(_s1_df['_년도'].unique(), reverse=True)
-    _s1_selected_year = st.selectbox("연도 선택", _s1_available_years, index=0, key="_s1_year")
+    from datetime import datetime as _dt
+    _s1_default_year = _dt.now().year - 1
+    _s1_default_idx = _s1_available_years.index(_s1_default_year) if _s1_default_year in _s1_available_years else 0
+    _s1_selected_year = st.selectbox("연도 선택", _s1_available_years, index=_s1_default_idx, key="_s1_year")
     _s1_year_df = _s1_df[_s1_df['_년도'] == _s1_selected_year]
 
+    # ── 분류(공연구분) 체크박스 ──
+    if _s1_perf_type_col:
+        _s1_types = sorted(_s1_year_df[_s1_perf_type_col].dropna().astype(str).str.strip().unique())
+        _s1_default_types = ['기획'] if '기획' in _s1_types else _s1_types
+        _s1_sel_types = st.multiselect("공연구분", _s1_types, default=_s1_default_types, key="_s1_types")
+        if _s1_sel_types:
+            _s1_year_df = _s1_year_df[_s1_year_df[_s1_perf_type_col].astype(str).str.strip().isin(_s1_sel_types)]
+
+    # ── 공연 단위 그룹화 (공연명 기준) ──
+    _weekday_kr = ['월', '화', '수', '목', '금', '토', '일']
+
     if _s1_year_df.empty:
-        st.info("해당 연도 데이터가 없습니다.")
+        st.info("해당 연도/분류 데이터가 없습니다.")
     else:
+        _s1_genre_col = '장르1' if '장르1' in _s1_year_df.columns else '세부\n장르'
+        _s1_grouped = _s1_year_df.groupby('공연명').agg(
+            _평균점유율=('_점유율', 'mean'),
+            _종료일=('_날짜', 'max'),
+            _유료합계=('발권\n유료', 'sum'),
+            _장르=(_s1_genre_col, 'first'),
+        ).reset_index()
+
+        # X축: 종료일 기준 월 위치
+        _s1_grouped['_월위치'] = _s1_grouped['_종료일'].dt.month + (_s1_grouped['_종료일'].dt.day - 1) / 31
+
+        # 호버용 날짜 포맷 (종료일)
+        _s1_grouped['_날짜포맷'] = _s1_grouped['_종료일'].apply(
+            lambda d: f"'{d.year % 100:02d}.{d.month:02d}.{d.day:02d}({_weekday_kr[d.weekday()]})"
+            if pd.notna(d) else ''
+        )
+
         _s1_fig = px.scatter(
-            _s1_year_df,
+            _s1_grouped,
             x='_월위치',
-            y='_점유율',
-            custom_data=['공연명', '장르1', '_날짜포맷', '발권\n유료', '_점유율'],
+            y='_평균점유율',
+            custom_data=['공연명', '_장르', '_날짜포맷', '_유료합계', '_평균점유율'],
             color_discrete_sequence=['#0FFD02'],
         )
         _s1_fig.update_traces(
@@ -112,11 +136,11 @@ if detail_df is not None and not detail_df.empty:
         _s1_fig = apply_common_layout(_s1_fig)
         st.plotly_chart(_s1_fig, use_container_width=True)
 
-        # 요약 지표
+        # 요약 지표 (그룹 기준)
         _s1_c1, _s1_c2, _s1_c3 = st.columns(3)
-        _s1_c1.metric("총 공연 수", f"{len(_s1_year_df)}건")
-        _s1_c2.metric("평균 점유율", f"{_s1_year_df['_점유율'].mean():.1f}%")
-        _s1_c3.metric("최고 점유율", f"{_s1_year_df['_점유율'].max():.1f}%")
+        _s1_c1.metric("총 공연 수", f"{len(_s1_grouped)}건")
+        _s1_c2.metric("평균 점유율", f"{_s1_grouped['_평균점유율'].mean():.1f}%")
+        _s1_c3.metric("최고 점유율", f"{_s1_grouped['_평균점유율'].max():.1f}%")
 
     st.divider()
 
