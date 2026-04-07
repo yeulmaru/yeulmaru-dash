@@ -78,6 +78,12 @@ div.stButton > button[kind="primary"]:focus:not(:active) {
     color: #0FFD02;
     border-color: #0FFD02;
 }
+/* [1] 회차 테이블 텍스트 셀 수직 중앙 정렬 */
+[data-testid="stHorizontalBlock"] > [data-testid="stColumn"] > div {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -541,9 +547,9 @@ for card_idx, (_, perf) in enumerate(active_df.iterrows()):
             _h[0].markdown(f'<div style="font-size:21px;font-weight:700;text-align:center;color:{LBL_BLUE};">#</div>', unsafe_allow_html=True)
             _h[1].markdown(f'<div style="font-size:21px;font-weight:700;text-align:center;color:{LBL_BLUE};">공연일/시각</div>', unsafe_allow_html=True)
             _h[2].markdown(f'<div style="font-size:21px;font-weight:700;text-align:center;color:{LBL_BLUE};">판매석</div>', unsafe_allow_html=True)
-            _h[3].markdown(f'<div style="font-size:14px;font-weight:700;text-align:center;color:{LBL_BLUE};">유료좌석</div>', unsafe_allow_html=True)
-            _h[4].markdown(f'<div style="font-size:14px;font-weight:700;text-align:center;color:{LBL_BLUE};">유료금액</div>', unsafe_allow_html=True)
-            _h[5].markdown(f'<div style="font-size:14px;font-weight:700;text-align:center;color:{LBL_BLUE};">무료좌석</div>', unsafe_allow_html=True)
+            _h[3].markdown(f'<div style="font-size:14px;font-weight:700;text-align:center;color:{LBL_BLUE};margin-bottom:8px;">유료좌석</div>', unsafe_allow_html=True)
+            _h[4].markdown(f'<div style="font-size:14px;font-weight:700;text-align:center;color:{LBL_BLUE};margin-bottom:8px;">유료금액</div>', unsafe_allow_html=True)
+            _h[5].markdown(f'<div style="font-size:14px;font-weight:700;text-align:center;color:{LBL_BLUE};margin-bottom:8px;">무료좌석</div>', unsafe_allow_html=True)
 
             for rd_info in perf_rounds_info:
                 rn = rd_info['round_no']
@@ -551,10 +557,10 @@ for card_idx, (_, perf) in enumerate(active_df.iterrows()):
                 with cols[0]:
                     st.markdown(f'<div style="font-size:21px;text-align:center;">{rn}</div>', unsafe_allow_html=True)
                 with cols[1]:
-                    st.markdown(f'<div style="font-size:21px;">{rd_info["date"]} {rd_info["time"]}</div>', unsafe_allow_html=True)
+                    st.markdown(f'<div style="font-size:21px;text-align:center;">{rd_info["date"]} {rd_info["time"]}</div>', unsafe_allow_html=True)
                 with cols[2]:
                     _rd_sold = round(cur_seats / total_rounds) if total_rounds > 0 else 0
-                    st.markdown(f'<div style="font-size:21px;text-align:right;color:{ACCENT};font-weight:700;">{_rd_sold:,}</div>', unsafe_allow_html=True)
+                    st.markdown(f'<div style="font-size:21px;text-align:center;color:{ACCENT};font-weight:700;">{_rd_sold:,}</div>', unsafe_allow_html=True)
 
                 result = _render_input_row(
                     perf_id, rn, rd_info['seat'],
@@ -573,9 +579,9 @@ for card_idx, (_, perf) in enumerate(active_df.iterrows()):
                 )
         else:
             _h = st.columns(3)
-            _h[0].markdown(f'<div style="font-size:14px;font-weight:700;text-align:center;color:{LBL_BLUE};">유료좌석</div>', unsafe_allow_html=True)
-            _h[1].markdown(f'<div style="font-size:14px;font-weight:700;text-align:center;color:{LBL_BLUE};">유료금액</div>', unsafe_allow_html=True)
-            _h[2].markdown(f'<div style="font-size:14px;font-weight:700;text-align:center;color:{LBL_BLUE};">무료좌석</div>', unsafe_allow_html=True)
+            _h[0].markdown(f'<div style="font-size:14px;font-weight:700;text-align:center;color:{LBL_BLUE};margin-bottom:8px;">유료좌석</div>', unsafe_allow_html=True)
+            _h[1].markdown(f'<div style="font-size:14px;font-weight:700;text-align:center;color:{LBL_BLUE};margin-bottom:8px;">유료금액</div>', unsafe_allow_html=True)
+            _h[2].markdown(f'<div style="font-size:14px;font-weight:700;text-align:center;color:{LBL_BLUE};margin-bottom:8px;">무료좌석</div>', unsafe_allow_html=True)
 
             input_cols = st.columns(3)
             result = _render_input_row(
