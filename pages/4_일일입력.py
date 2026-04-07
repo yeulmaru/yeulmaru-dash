@@ -13,7 +13,7 @@ from utils.data_loader import (
     get_target_occupancy,
     match_performance,
 )
-from utils.local_excel_writer import save_daily_entry_local as save_daily_entry
+# save_daily_entry: Cloud/로컬 자동 분기 (아래 _IS_CLOUD 이후 설정)
 from utils.charts import COLORS
 
 st.set_page_config(page_title="일일입력", page_icon="📝", layout="wide")
@@ -21,13 +21,12 @@ st.set_page_config(page_title="일일입력", page_icon="📝", layout="wide")
 from utils.auth import check_password
 check_password()
 
-# ── Cloud 환경 감지 (Streamlit Cloud에서는 일일입력 차단) ──
+# ── Cloud 환경 감지 ──
 import os
 _IS_CLOUD = os.path.exists("/mount/src")
-if _IS_CLOUD:
-    st.warning("📝 일일입력은 사무실 PC에서만 가능합니다")
-    st.info("사무실 PC에서 지정된 방법으로 조회바랍니다.\n\n문의: 황세웅 선임")
-    st.stop()
+# Cloud에서도 일일입력 가능 (SharePoint Graph API 직접 쓰기)
+from utils.local_excel_writer import save_daily_entry_local, save_daily_entry_cloud
+save_daily_entry = save_daily_entry_cloud if _IS_CLOUD else save_daily_entry_local
 
 # ── 상수 ──
 WEEKDAYS_KR = ['월', '화', '수', '목', '금', '토', '일']
@@ -593,6 +592,10 @@ for card_idx, (_, perf) in enumerate(active_df.iterrows()):
                     st.cache_data.clear()
                     st.rerun()
                 else:
+                    for sr in save_res:
+                        if sr.get('is_conflict'):
+                            st.error("문서가 현재 사용 중에 있습니다. 잠시 후에 시도해주세요.")
+                            break
                     st.rerun()
 
         # ── 카드 저장 결과 표시 (자기 카드만, 5초 이내) ──
@@ -670,6 +673,11 @@ if has_any:
                             del st.session_state[_k]
                 st.session_state.has_unsaved_changes = False
                 st.cache_data.clear()
+            else:
+                for r in all_results:
+                    if r.get('is_conflict'):
+                        st.error("문서가 현재 사용 중에 있습니다. 잠시 후에 시도해주세요.")
+                        break
             st.rerun()
 else:
     st.markdown(

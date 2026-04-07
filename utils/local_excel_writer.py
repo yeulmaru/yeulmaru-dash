@@ -142,16 +142,15 @@ def _find_matching_row(ws, header_row, date_int, perf_name, round_time):
 
 
 
-def save_daily_entry_local(
-    date_int, perf_name, perf_date_str, round_time,
+def _write_daily_entry_to_workbook(
+    wb, date_int, perf_name, perf_date_str, round_time,
     open_seats, paid_seats, paid_amount, free_seats,
     prev_seats=0, prev_amount=0,
     data_type='일일입력',
 ):
-    """일일입력 시트 누적기록에 1행 저장 (로컬 파일 직접 쓰기).
+    """workbook 객체에 일일입력 17컬럼 쓰기 (UPDATE or INSERT).
 
-    Graph API Workbook 엔드포인트 대신 로컬 OneDrive 동기화 파일을 수정.
-    OneDrive가 자동으로 SharePoint와 동기화.
+    workbook을 받아서 메모리에서 수정만 함. 저장은 호출자가 담당.
 
     Returns:
         dict: {status: 'updated'|'inserted'|'error', row: int|None, message: str}
@@ -165,20 +164,7 @@ def save_daily_entry_local(
     diff_amount = total_amount - prev_amount
     now_time = datetime.now().strftime('%H:%M:%S')
 
-    # 2. 로컬 파일 탐지
-    local_path = find_local_excel_path()
-    if not local_path:
-        return {
-            "status": "error",
-            "row": None,
-            "message": (
-                "로컬 엑셀 파일을 찾을 수 없습니다. "
-                "OneDrive 동기화가 설정된 PC에서 실행해야 저장 가능합니다. "
-                f"확인 경로: {LOCAL_EXCEL_CANDIDATES}"
-            ),
-        }
-
-    # 3. 데이터 행 구성 (A~Q, 17컬럼)
+    # 2. 데이터 행 구성 (A~Q, 17컬럼)
     row_data = [
         date_int,                                      # A: 기준일자
         perf_name,                                     # B: 공연명
@@ -199,73 +185,164 @@ def save_daily_entry_local(
         data_type,                                     # Q: 데이터유형
     ]
 
-    # 4. 파일 열기
-    try:
-        wb = load_workbook(local_path)
-    except PermissionError as e:
+    # 3. 시트 찾기
+    if '일일입력' not in wb.sheetnames:
+        return {"status": "error", "row": None,
+                "message": "'일일입력' 시트를 찾을 수 없습니다."}
+    ws = wb['일일입력']
+
+    header_row = _find_cumulative_header_row(ws)
+    if header_row is None:
+        return {"status": "error", "row": None,
+                "message": "누적기록 헤더 행을 찾을 수 없습니다."}
+
+    # 4. 매칭 행 탐색
+    existing_row = _find_matching_row(ws, header_row, date_int, perf_name, round_time)
+
+    if existing_row:
+        target_row = existing_row
+        status = "updated"
+    else:
+        target_row = _find_insert_row(ws, header_row)
+        status = "inserted"
+
+    # 5. 행에 데이터 쓰기
+    for col_idx, val in enumerate(row_data, start=1):
+        ws.cell(row=target_row, column=col_idx).value = val
+
+    return {
+        "status": status,
+        "row": target_row,
+        "message": (
+            f"행 {target_row} 갱신 완료 ({now_time})"
+            if status == "updated"
+            else f"행 {target_row} 신규 저장 ({now_time})"
+        ),
+    }
+
+
+def save_daily_entry_local(
+    date_int, perf_name, perf_date_str, round_time,
+    open_seats, paid_seats, paid_amount, free_seats,
+    prev_seats=0, prev_amount=0,
+    data_type='일일입력',
+):
+    """일일입력 시트 누적기록에 1행 저장 (로컬 파일 직접 쓰기).
+
+    Returns:
+        dict: {status: 'updated'|'inserted'|'error', row: int|None, message: str}
+    """
+    local_path = find_local_excel_path()
+    if not local_path:
         return {
             "status": "error",
             "row": None,
-            "message": f"파일 열기 실패 (Excel로 열려있는지 확인): {e}",
+            "message": (
+                "로컬 엑셀 파일을 찾을 수 없습니다. "
+                "OneDrive 동기화가 설정된 PC에서 실행해야 저장 가능합니다. "
+                f"확인 경로: {LOCAL_EXCEL_CANDIDATES}"
+            ),
         }
+
+    try:
+        wb = load_workbook(local_path)
+    except PermissionError as e:
+        return {"status": "error", "row": None,
+                "message": f"파일 열기 실패 (Excel로 열려있는지 확인): {e}"}
     except Exception as e:
         return {"status": "error", "row": None, "message": f"파일 로드 실패: {e}"}
 
     try:
-        if '일일입력' not in wb.sheetnames:
+        result = _write_daily_entry_to_workbook(
+            wb, date_int, perf_name, perf_date_str, round_time,
+            open_seats, paid_seats, paid_amount, free_seats,
+            prev_seats, prev_amount, data_type,
+        )
+        if result['status'] == 'error':
             wb.close()
-            return {"status": "error", "row": None,
-                    "message": "'일일입력' 시트를 찾을 수 없습니다."}
-        ws = wb['일일입력']
-
-        header_row = _find_cumulative_header_row(ws)
-        if header_row is None:
-            wb.close()
-            return {"status": "error", "row": None,
-                    "message": "누적기록 헤더 행을 찾을 수 없습니다."}
-
-        # 5. 매칭 행 탐색
-        existing_row = _find_matching_row(ws, header_row, date_int, perf_name, round_time)
-
-        if existing_row:
-            # UPDATE
-            target_row = existing_row
-            status = "updated"
-        else:
-            # INSERT: 안내 텍스트 섬 건너뛴 빈 영역 첫 행
-            target_row = _find_insert_row(ws, header_row)
-            status = "inserted"
-
-        # 6. 행에 데이터 쓰기
-        for col_idx, val in enumerate(row_data, start=1):
-            ws.cell(row=target_row, column=col_idx).value = val
-
-        # 7. 저장
+            return result
         wb.save(local_path)
         wb.close()
-
-        return {
-            "status": status,
-            "row": target_row,
-            "message": (
-                f"행 {target_row} 갱신 완료 ({now_time})"
-                if status == "updated"
-                else f"행 {target_row} 신규 저장 ({now_time})"
-            ),
-        }
+        return result
     except PermissionError as e:
         try:
             wb.close()
         except Exception:
             pass
-        return {
-            "status": "error",
-            "row": None,
-            "message": f"파일 저장 실패 (Excel로 열려있는지 확인): {e}",
-        }
+        return {"status": "error", "row": None,
+                "message": f"파일 저장 실패 (Excel로 열려있는지 확인): {e}"}
     except Exception as e:
         try:
             wb.close()
         except Exception:
             pass
         return {"status": "error", "row": None, "message": f"저장 중 예외: {e}"}
+
+
+def save_daily_entry_cloud(
+    date_int, perf_name, perf_date_str, round_time,
+    open_seats, paid_seats, paid_amount, free_seats,
+    prev_seats=0, prev_amount=0,
+    data_type='일일입력',
+):
+    """일일입력 시트 누적기록에 1행 저장 (SharePoint Cloud 쓰기).
+
+    Returns:
+        dict: {status: 'updated'|'inserted'|'error', row: int|None, message: str}
+    """
+    from io import BytesIO
+    from utils.data_loader import (
+        download_excel_from_sharepoint,
+        upload_excel_to_sharepoint,
+        _find_sharepoint_file_ids,
+    )
+
+    try:
+        # 1) 최신 ETag 확보
+        ids = _find_sharepoint_file_ids(force_refresh=True)
+        expected_etag = ids['etag']
+
+        # 2) 파일 다운로드 (캐시 무효화)
+        download_excel_from_sharepoint.clear()
+        raw_bytes = download_excel_from_sharepoint()
+        if raw_bytes is None:
+            return {"status": "error", "row": None,
+                    "message": "SharePoint 다운로드 실패"}
+
+        # 3) 메모리에서 openpyxl로 수정
+        wb = load_workbook(BytesIO(raw_bytes))
+        result = _write_daily_entry_to_workbook(
+            wb, date_int, perf_name, perf_date_str, round_time,
+            open_seats, paid_seats, paid_amount, free_seats,
+            prev_seats, prev_amount, data_type,
+        )
+        if result['status'] == 'error':
+            wb.close()
+            return result
+
+        # 4) 메모리 bytes로 저장
+        output = BytesIO()
+        wb.save(output)
+        wb.close()
+        output.seek(0)
+        modified_bytes = output.read()
+
+        # 5) SharePoint에 업로드 (ETag 조건부)
+        success, new_etag, error_msg = upload_excel_to_sharepoint(
+            modified_bytes, expected_etag=expected_etag
+        )
+
+        if not success:
+            is_conflict = "사용 중" in (error_msg or "")
+            return {
+                "status": "error",
+                "row": None,
+                "message": error_msg,
+                "is_conflict": is_conflict,
+            }
+
+        return result
+
+    except Exception as e:
+        return {"status": "error", "row": None,
+                "message": f"Cloud 저장 오류: {str(e)}"}
