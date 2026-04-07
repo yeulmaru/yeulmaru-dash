@@ -365,7 +365,6 @@ if detail_df is not None and not detail_df.empty:
             '판매좌석(석)': _s1_tbl['_유료합계'].fillna(0).astype(int),
             '오픈석(석)': _s1_tbl['_오픈합계'].fillna(0).astype(int),
             '점유율(%)': _s1_tbl['_평균점유율'].round(1),
-            '판매금액(만원)': pd.Series([None] * len(_s1_tbl), dtype='Int64'),
         }).reset_index(drop=True)
 
         def _zebra(row):
@@ -377,8 +376,6 @@ if detail_df is not None and not detail_df.empty:
             **{'color': '#FFEB3B'}, subset=['판매좌석(석)']
         ).set_properties(
             **{'color': '#0FFD02', 'font-weight': '700'}, subset=['점유율(%)']
-        ).set_properties(
-            **{'color': '#0FFD02'}, subset=['판매금액(만원)']
         ).apply(_zebra, axis=1)
 
         _s1_tbl_height = min(35 * (len(_s1_display) + 1) + 3, 600)
@@ -395,7 +392,6 @@ if detail_df is not None and not detail_df.empty:
                 '판매좌석(석)': st.column_config.NumberColumn('판매좌석(석)', format='%,d'),
                 '오픈석(석)': st.column_config.NumberColumn('오픈석(석)', format='%,d'),
                 '점유율(%)': st.column_config.NumberColumn('점유율(%)', format='%.1f'),
-                '판매금액(만원)': st.column_config.NumberColumn('판매금액(만원)', format='%,d'),
             },
         )
 
