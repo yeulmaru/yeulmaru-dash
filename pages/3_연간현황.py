@@ -217,14 +217,14 @@ if detail_df is not None and not detail_df.empty:
 
             ],
         )
-        # ── 카테고리별 평균 점선 + 우측 수치 ──
-        _avg_annotations = []
-        _used_y = []
+        # ── 카테고리별 평균 점선 + 우측 수치 (겹침 회피) ──
+        _avg_list = []
         for _cat, _color in _s1_color_map.items():
             _cat_df = _s1_grouped[_s1_grouped[_s1_color_col] == _cat]
             if _cat_df.empty:
                 continue
             _avg = _cat_df['_평균점유율'].mean()
+            _avg_list.append({'avg': _avg, 'cat': _cat, 'color': _color})
 
             _s1_fig.add_shape(
                 type='line', x0=0.5, x1=12.5, y0=_avg, y1=_avg,
@@ -232,26 +232,48 @@ if detail_df is not None and not detail_df.empty:
                 opacity=0.5,
             )
 
-            # 겹침 방지: 기존 수치와 Y 간격 < 3이면 오프셋
-            _adj_y = _avg
-            for _uy in _used_y:
-                if abs(_adj_y - _uy) < 3:
-                    _adj_y = _uy + 3
-            _used_y.append(_adj_y)
+        # Y 내림차순 정렬 (위쪽 = 우선, 자기 위치 고수)
+        _avg_list.sort(key=lambda a: -a['avg'])
 
-            # 숫자 + 카테고리명 (차트 안쪽 우측)
+        # 11~12월 점 Y 위치 (회피 대상)
+        _late_y = _s1_grouped[_s1_grouped['_월위치'] >= 10.5]['_평균점유율'].tolist()
+
+        _THRESHOLD_Y = 4
+        _DEFAULT_X = 0.96
+        _STEP_X = 0.08
+        _MIN_X = 0.72
+        _placed = []
+
+        for _item in _avg_list:
+            _x = _DEFAULT_X
+            while _x >= _MIN_X:
+                _clash_placed = any(
+                    abs(_item['avg'] - p['avg']) < _THRESHOLD_Y and abs(_x - p['x']) < 0.05
+                    for p in _placed
+                )
+                _clash_points = any(
+                    abs(_item['avg'] - py) < _THRESHOLD_Y and _x > 0.85
+                    for py in _late_y
+                )
+                if not _clash_placed and not _clash_points:
+                    break
+                _x -= _STEP_X
+            _item['x'] = max(_x, _MIN_X)
+            _placed.append(_item)
+
+        _avg_annotations = []
+        for _item in _placed:
             _avg_annotations.append(dict(
-                x=0.96, y=_adj_y,
+                x=_item['x'], y=_item['avg'],
                 xref='paper', yref='y',
-                text=f"{_avg:.0f}  ({_cat})",
+                text=f"{_item['avg']:.0f}  ({_item['cat']})",
                 showarrow=False,
                 xanchor='right', yanchor='middle',
-                font=dict(color=_color, size=11),
+                font=dict(color=_item['color'], size=11),
                 bgcolor='rgba(0,0,0,0.6)',
                 borderpad=3,
             ))
 
-        # 기존 annotations에 평균 annotations 추가
         _s1_fig.layout.annotations = list(_s1_fig.layout.annotations) + _avg_annotations
 
         _s1_fig = apply_common_layout(_s1_fig)
