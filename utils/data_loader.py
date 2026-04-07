@@ -32,64 +32,112 @@ def get_access_token():
     return response.json()["access_token"]
 
 
+def _find_sharepoint_file_ids(force_refresh=False):
+    """SharePoint 파일의 site_id/drive_id/item_id/etag를 찾아 session_state에 캐시"""
+    if not force_refresh and 'sp_file_ids' in st.session_state:
+        return st.session_state['sp_file_ids']
+
+    token = get_access_token()
+    headers = {"Authorization": f"Bearer {token}"}
+    site_name = st.secrets["azure"]["site_name"]
+    file_name = st.secrets["azure"]["file_name"]
+    graph_base = "https://graph.microsoft.com/v1.0"
+
+    # 1) 사이트 ID
+    site_url = f"{graph_base}/sites/gscaltexyeulmaru.sharepoint.com:/sites/{site_name}"
+    site_resp = requests.get(site_url, headers=headers)
+    site_resp.raise_for_status()
+    site_id = site_resp.json()["id"]
+
+    # 2) 드라이브 + 파일 검색
+    drives_url = f"{graph_base}/sites/{site_id}/drives"
+    drives_resp = requests.get(drives_url, headers=headers)
+    drives_resp.raise_for_status()
+    drives = drives_resp.json().get("value", [])
+
+    target = None
+    target_drive_id = None
+    for drv in drives:
+        drive_id = drv["id"]
+        search_url = f"{graph_base}/drives/{drive_id}/root/search(q='{file_name}')"
+        search_resp = requests.get(search_url, headers=headers)
+        if search_resp.status_code != 200:
+            continue
+        items = search_resp.json().get("value", [])
+        for item in items:
+            if item.get("name") == file_name:
+                target = item
+                target_drive_id = drive_id
+                break
+        if target:
+            break
+
+    if not target:
+        raise FileNotFoundError(f"SharePoint에서 {file_name}을(를) 찾을 수 없습니다")
+
+    result = {
+        'site_id': site_id,
+        'drive_id': target_drive_id,
+        'item_id': target['id'],
+        'etag': target.get('eTag', '').strip('"').strip(),
+    }
+    st.session_state['sp_file_ids'] = result
+    return result
+
+
 @st.cache_data(ttl=60)
 def download_excel_from_sharepoint():
     """SharePoint에서 엑셀 파일 다운로드 -> raw bytes 반환"""
     try:
+        ids = _find_sharepoint_file_ids()
         token = get_access_token()
         headers = {"Authorization": f"Bearer {token}"}
-        site_name = st.secrets["azure"]["site_name"]
-        file_name = st.secrets["azure"]["file_name"]
         graph_base = "https://graph.microsoft.com/v1.0"
 
-        # 1) 사이트 ID 조회
-        site_url = f"{graph_base}/sites/gscaltexyeulmaru.sharepoint.com:/sites/{site_name}"
-        site_resp = requests.get(site_url, headers=headers)
-        site_resp.raise_for_status()
-        site_id = site_resp.json()["id"]
-
-        # 2) 드라이브 검색
-        drives_url = f"{graph_base}/sites/{site_id}/drives"
-        drives_resp = requests.get(drives_url, headers=headers)
-        drives_resp.raise_for_status()
-        drives = drives_resp.json().get("value", [])
-
-        target = None
-        target_drive_id = None
-        for drv in drives:
-            drive_id = drv["id"]
-            search_url = f"{graph_base}/drives/{drive_id}/root/search(q='{file_name}')"
-            search_resp = requests.get(search_url, headers=headers)
-            if search_resp.status_code != 200:
-                continue
-            items = search_resp.json().get("value", [])
-            for item in items:
-                if item.get("name") == file_name:
-                    target = item
-                    target_drive_id = drive_id
-                    break
-            if target:
-                break
-
-        if not target:
-            return None
-
-        # 3) downloadUrl로 파일 받기 (Workbook API 사용 안 함)
-        download_url = target.get("@microsoft.graph.downloadUrl")
-        if download_url:
-            file_resp = requests.get(download_url)
-            file_resp.raise_for_status()
-            return file_resp.content
-
-        # fallback: drives/items/content
-        item_id = target["id"]
-        content_url = f"{graph_base}/drives/{target_drive_id}/items/{item_id}/content"
+        content_url = f"{graph_base}/drives/{ids['drive_id']}/items/{ids['item_id']}/content"
         file_resp = requests.get(content_url, headers=headers)
         file_resp.raise_for_status()
         return file_resp.content
-
     except Exception:
         return None
+
+
+def upload_excel_to_sharepoint(content_bytes, expected_etag=None):
+    """수정된 엑셀 bytes를 SharePoint에 업로드. ETag로 충돌 감지.
+
+    Returns:
+        (True, new_etag, None) — 성공
+        (False, None, error_message) — 실패
+    """
+    try:
+        token = get_access_token()
+        ids = _find_sharepoint_file_ids()
+
+        url = f"https://graph.microsoft.com/v1.0/drives/{ids['drive_id']}/items/{ids['item_id']}/content"
+        headers = {
+            "Authorization": f"Bearer {token}",
+            "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        }
+        if expected_etag:
+            headers["If-Match"] = f'"{expected_etag}"'
+
+        resp = requests.put(url, headers=headers, data=content_bytes)
+
+        if resp.status_code == 412:
+            if 'sp_file_ids' in st.session_state:
+                del st.session_state['sp_file_ids']
+            return (False, None, "문서가 현재 사용 중에 있습니다. 잠시 후에 시도해주세요.")
+
+        if resp.status_code in (200, 201):
+            new_etag = resp.json().get('eTag', '').strip('"').strip()
+            if 'sp_file_ids' in st.session_state:
+                st.session_state['sp_file_ids']['etag'] = new_etag
+            return (True, new_etag, None)
+
+        return (False, None, f"업로드 실패 (HTTP {resp.status_code}): {resp.text[:200]}")
+
+    except Exception as e:
+        return (False, None, f"업로드 오류: {str(e)}")
 
 
 def get_excel_data():
