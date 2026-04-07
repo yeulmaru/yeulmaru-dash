@@ -254,13 +254,13 @@ def _render_input_row(perf_id, round_no, seat_capacity, cols_spec, prefill=None)
 
     c1, c2, c3 = cols_spec
     with c1:
-        paid_s = st.number_input("유료좌석", min_value=0, value=def_paid_s,
+        paid_s = st.number_input("유료좌석", value=def_paid_s,
                                   step=1, key=f"{sk}_ps", label_visibility="collapsed")
     with c2:
-        paid_a = st.number_input("유료금액", min_value=0, value=def_paid_a,
+        paid_a = st.number_input("유료금액", value=def_paid_a,
                                   step=1000, key=f"{sk}_pa", label_visibility="collapsed")
     with c3:
-        free_s = st.number_input("무료좌석", min_value=0, value=def_free,
+        free_s = st.number_input("무료좌석", value=def_free,
                                   step=1, key=f"{sk}_fr", label_visibility="collapsed")
 
     total_seats = paid_s + free_s
