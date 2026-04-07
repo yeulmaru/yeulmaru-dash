@@ -472,9 +472,9 @@ for card_idx, (_, perf) in enumerate(active_df.iterrows()):
 
         if total_rounds > 1 and perf_rounds_info:
             _h = st.columns([0.4, 0.9, 0.6, 0.8, 0.8, 0.8])
-            _h[0].markdown("**#**")
-            _h[1].markdown("**공연일/시각**")
-            _h[2].markdown("**가용석**")
+            _h[0].markdown('<div style="font-size:21px;font-weight:700;">#</div>', unsafe_allow_html=True)
+            _h[1].markdown('<div style="font-size:21px;font-weight:700;">공연일/시각</div>', unsafe_allow_html=True)
+            _h[2].markdown('<div style="font-size:21px;font-weight:700;">가용석</div>', unsafe_allow_html=True)
             _h[3].markdown("**유료좌석**")
             _h[4].markdown("**유료금액**")
             _h[5].markdown("**무료좌석**")
@@ -483,11 +483,11 @@ for card_idx, (_, perf) in enumerate(active_df.iterrows()):
                 rn = rd_info['round_no']
                 cols = st.columns([0.4, 0.9, 0.6, 0.8, 0.8, 0.8])
                 with cols[0]:
-                    st.markdown(f"`{rn}`")
+                    st.markdown(f'<div style="font-size:21px;">{rn}</div>', unsafe_allow_html=True)
                 with cols[1]:
-                    st.markdown(f"{rd_info['date']} {rd_info['time']}")
+                    st.markdown(f'<div style="font-size:21px;">{rd_info["date"]} {rd_info["time"]}</div>', unsafe_allow_html=True)
                 with cols[2]:
-                    st.markdown(f"{rd_info['seat']:,}")
+                    st.markdown(f'<div style="font-size:21px;">{rd_info["seat"]:,}</div>', unsafe_allow_html=True)
 
                 result = _render_input_row(
                     perf_id, rn, rd_info['seat'],
