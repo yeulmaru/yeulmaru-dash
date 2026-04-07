@@ -90,16 +90,30 @@ div.stButton > button[kind="primary"]:focus:not(:active) {
     border-radius: 4px;
     padding: 2px 0;
 }
-/* 회차 테이블 행 정렬: 부모 flex center + 빈 label 제거 + margin 0 */
+/* 회차 테이블 행 정렬 */
 .round-table-wrap div[data-testid="stHorizontalBlock"] {
     align-items: center !important;
 }
-.round-table-wrap div[data-testid="stNumberInput"] label {
+/* 방법 A: stNumberInput 빈 label/wrapper 완전 제거 (모든 selector) */
+.round-table-wrap div[data-testid="stNumberInput"] label,
+.round-table-wrap div[data-testid="stNumberInput"] [data-testid="stWidgetLabel"],
+.round-table-wrap div[data-testid="stNumberInput"] > label {
     display: none !important;
+    height: 0 !important;
+    min-height: 0 !important;
+    max-height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
 }
 .round-table-wrap div[data-testid="stNumberInput"] {
     margin-top: 0 !important;
     margin-bottom: 0 !important;
+    padding-top: 0 !important;
+}
+/* 방법 B: 텍스트 셀에 padding-top 보정 (~12px, label wrapper 잔여 높이 절반) */
+.round-table-wrap div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"] .round-text {
+    padding-top: 12px;
 }
 </style>
 """, unsafe_allow_html=True)
@@ -574,12 +588,12 @@ for card_idx, (_, perf) in enumerate(active_df.iterrows()):
                 rn = rd_info['round_no']
                 cols = st.columns([0.4, 0.9, 0.6, 0.8, 0.8, 0.8])
                 with cols[0]:
-                    st.markdown(f'<div style="font-size:21px;text-align:center;">{rn}</div>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="round-text" style="font-size:21px;text-align:center;">{rn}</div>', unsafe_allow_html=True)
                 with cols[1]:
-                    st.markdown(f'<div style="font-size:21px;text-align:center;">{rd_info["date"]} {rd_info["time"]}</div>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="round-text" style="font-size:21px;text-align:center;">{rd_info["date"]} {rd_info["time"]}</div>', unsafe_allow_html=True)
                 with cols[2]:
                     _rd_sold = round(_hdr_seats / total_rounds) if total_rounds > 0 else 0
-                    st.markdown(f'<div style="font-size:21px;text-align:center;color:{ACCENT};font-weight:700;">{_rd_sold:,}</div>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="round-text" style="font-size:21px;text-align:center;color:{ACCENT};font-weight:700;">{_rd_sold:,}</div>', unsafe_allow_html=True)
 
                 result = _render_input_row(
                     perf_id, rn, rd_info['seat'],
