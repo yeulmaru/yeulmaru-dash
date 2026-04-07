@@ -192,7 +192,7 @@ if detail_df is not None and not detail_df.empty:
         _s1_c2.metric("평균 점유율", f"{_s1_grouped['_평균점유율'].mean():.1f}%")
         _s1_c3.metric("최고 점유율", f"{_s1_grouped['_평균점유율'].max():.1f}%")
 
-        # ── 공연 목록 표 ──
+        # ── 공연 목록 표 (st.dataframe) ──
         _s1_tbl = _s1_grouped.sort_values('_종료일').copy()
 
         def _fmt_date_range(row):
@@ -206,47 +206,42 @@ if detail_df is not None and not detail_df.empty:
                 return f"{s.month}.{s.day}({_wd[s.weekday()]})~{e.day}({_wd[e.weekday()]})"
             return f"{s.month}.{s.day}({_wd[s.weekday()]})~{e.month}.{e.day}({_wd[e.weekday()]})"
 
-        _G = '#0FFD02'
-        _Y = '#FFEB3B'
-        _W = '#FFFFFF'
-        _HDR_BG = 'rgba(255,255,255,0.06)'
-        _tbl_rows = []
-        for _, r in _s1_tbl.iterrows():
-            _date_str = _fmt_date_range(r)
-            _paid = int(r['_유료합계']) if pd.notna(r['_유료합계']) else 0
-            _open = int(r['_오픈합계']) if pd.notna(r['_오픈합계']) else 0
-            _occ = r['_평균점유율']
-            _rounds = int(r['_회차수'])
-            _genre = str(r['_장르']) if pd.notna(r['_장르']) else ''
-            _tbl_rows.append(
-                f'<tr>'
-                f'<td style="padding:6px 10px;width:8%;color:{_W};">{_date_str}</td>'
-                f'<td style="padding:6px 10px;width:32%;color:{_W};">{r["공연명"]}</td>'
-                f'<td style="padding:6px 10px;width:11%;color:{_W};">{_genre}</td>'
-                f'<td style="padding:6px 10px;width:6%;text-align:center;color:{_W};">{_rounds}</td>'
-                f'<td style="padding:6px 10px;width:10%;text-align:right;color:{_Y};">{_paid:,}</td>'
-                f'<td style="padding:6px 10px;width:10%;text-align:right;color:{_W};">{_open:,}</td>'
-                f'<td style="padding:6px 10px;width:8%;text-align:right;color:{_G};font-weight:700;">{_occ:.1f}</td>'
-                f'<td style="padding:6px 10px;width:11%;text-align:right;color:{_G};">-</td>'
-                f'</tr>'
-            )
+        _s1_display = pd.DataFrame({
+            '공연일': _s1_tbl.apply(_fmt_date_range, axis=1),
+            '공연명': _s1_tbl['공연명'],
+            '장르': _s1_tbl['_장르'].fillna(''),
+            '회차': _s1_tbl['_회차수'].astype(int),
+            '판매좌석(석)': _s1_tbl['_유료합계'].fillna(0).astype(int),
+            '오픈석(석)': _s1_tbl['_오픈합계'].fillna(0).astype(int),
+            '점유율(%)': _s1_tbl['_평균점유율'].round(1),
+            '판매금액(만원)': pd.Series([None] * len(_s1_tbl), dtype='Int64'),
+        }).reset_index(drop=True)
 
-        _tbl_html = (
-            f'<table style="width:100%;border-collapse:collapse;font-size:15px;margin-top:16px;">'
-            f'<tr style="background:{_HDR_BG};border-bottom:1px solid #444;">'
-            f'<th style="padding:8px 10px;width:8%;text-align:left;font-weight:700;">공연일</th>'
-            f'<th style="padding:8px 10px;width:32%;text-align:left;font-weight:700;">공연명</th>'
-            f'<th style="padding:8px 10px;width:11%;text-align:left;font-weight:700;">장르</th>'
-            f'<th style="padding:8px 10px;width:6%;text-align:center;font-weight:700;">회차</th>'
-            f'<th style="padding:8px 10px;width:10%;text-align:right;font-weight:700;">판매좌석(석)</th>'
-            f'<th style="padding:8px 10px;width:10%;text-align:right;font-weight:700;">오픈석(석)</th>'
-            f'<th style="padding:8px 10px;width:8%;text-align:right;font-weight:700;">점유율(%)</th>'
-            f'<th style="padding:8px 10px;width:11%;text-align:right;font-weight:700;">판매금액(만원)</th>'
-            f'</tr>'
-            + ''.join(_tbl_rows)
-            + '</table>'
+        _s1_styled = _s1_display.style.set_properties(
+            **{'color': '#FFEB3B'}, subset=['판매좌석(석)']
+        ).set_properties(
+            **{'color': '#0FFD02', 'font-weight': '700'}, subset=['점유율(%)']
+        ).set_properties(
+            **{'color': '#0FFD02'}, subset=['판매금액(만원)']
         )
-        st.markdown(_tbl_html, unsafe_allow_html=True)
+
+        _s1_tbl_height = min(35 * (len(_s1_display) + 1) + 3, 600)
+        st.dataframe(
+            _s1_styled,
+            use_container_width=True,
+            hide_index=True,
+            height=_s1_tbl_height,
+            column_config={
+                '공연일': st.column_config.TextColumn('공연일', width='small'),
+                '공연명': st.column_config.TextColumn('공연명', width='large'),
+                '장르': st.column_config.TextColumn('장르', width='small'),
+                '회차': st.column_config.NumberColumn('회차', width='small', format='%d'),
+                '판매좌석(석)': st.column_config.NumberColumn('판매좌석(석)', format='%,d'),
+                '오픈석(석)': st.column_config.NumberColumn('오픈석(석)', format='%,d'),
+                '점유율(%)': st.column_config.NumberColumn('점유율(%)', format='%.1f'),
+                '판매금액(만원)': st.column_config.NumberColumn('판매금액(만원)', format='%,d'),
+            },
+        )
 
     st.divider()
 
