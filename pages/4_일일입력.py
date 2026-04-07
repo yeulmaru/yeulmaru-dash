@@ -462,22 +462,26 @@ for card_idx, (_, perf) in enumerate(active_df.iterrows()):
         st.markdown('<div style="margin-top:20px;"></div>', unsafe_allow_html=True)
 
         # ── 헤더 메타정보 (1번 구분선 위) ──
+        _hdr_cur = latest_saved or {}
+        _hdr_seats = int(_hdr_cur.get('합계좌석', 0) or 0)
+        _hdr_occ = (_hdr_seats / total_open * 100) if total_open > 0 else 0.0
+        _hdr_occ_i = round(_hdr_occ)
+        _hdr_tgt_i = round(target_occ)
+        _hdr_seats_s = f"{_hdr_seats:,}" if _hdr_seats >= 1000 else str(_hdr_seats)
+        _hdr_open_s = f"{total_open:,}" if total_open >= 1000 else str(total_open)
+        _G = "#0FFD02"
+
         if total_rounds <= 1 and perf_rounds_info:
-            # 단일회차: 회차 / 공연일+시각 / 가용석 / 오픈석 / 목표
             _ri0 = perf_rounds_info[0]
-            ic = st.columns([0.7, 1.8, 0.8, 0.8, 0.7], gap="small")
-            ic[0].markdown(f'<div style="font-size:21px;"><b>회차</b> &nbsp; {total_rounds}회</div>', unsafe_allow_html=True)
-            ic[1].markdown(f'<div style="font-size:21px;"><b>공연일</b> &nbsp; {_ri0["date"]} {_ri0["time"]}</div>', unsafe_allow_html=True)
-            ic[2].markdown(f'<div style="font-size:21px;"><b>가용석</b> &nbsp; {_ri0["seat"]:,}석</div>', unsafe_allow_html=True)
-            ic[3].markdown(f'<div style="font-size:21px;"><b>오픈석</b> &nbsp; {total_open:,}석</div>', unsafe_allow_html=True)
-            ic[4].markdown(f'<div style="font-size:21px;"><b>목표</b> &nbsp; {target_occ}%</div>', unsafe_allow_html=True)
+            _hdr_date = f'{_ri0["date"]} {_ri0["time"]}'
         else:
-            # 복수회차 (또는 회차정보 없음): 공연일(기간) / 회차 / 오픈석 / 목표
-            ic = st.columns(4, gap="small")
-            ic[0].markdown(f'<div style="font-size:21px;"><b>공연일</b> &nbsp; {date_range}</div>', unsafe_allow_html=True)
-            ic[1].markdown(f'<div style="font-size:21px;"><b>회차</b> &nbsp; {total_rounds}회</div>', unsafe_allow_html=True)
-            ic[2].markdown(f'<div style="font-size:21px;"><b>오픈석</b> &nbsp; {total_open:,}석</div>', unsafe_allow_html=True)
-            ic[3].markdown(f'<div style="font-size:21px;"><b>목표</b> &nbsp; {target_occ}%</div>', unsafe_allow_html=True)
+            _hdr_date = date_range
+
+        ic = st.columns([3, 1, 1.5, 1], gap="small")
+        ic[0].markdown(f'<div style="font-size:21px;">공연 일시 : <span style="color:{_G};font-weight:700;">{_hdr_date}</span></div>', unsafe_allow_html=True)
+        ic[1].markdown(f'<div style="font-size:21px;"><span style="color:{_G};font-weight:700;">{total_rounds}</span> 회차</div>', unsafe_allow_html=True)
+        ic[2].markdown(f'<div style="font-size:21px;"><span style="color:{_G};font-weight:700;">{_hdr_seats_s}</span>/{_hdr_open_s}석 판매</div>', unsafe_allow_html=True)
+        ic[3].markdown(f'<div style="font-size:21px;"><span style="color:{_G};font-weight:700;">{_hdr_occ_i}%</span> to {_hdr_tgt_i}%</div>', unsafe_allow_html=True)
 
         st.markdown("---")
         st.markdown('<div style="margin-bottom:8px;"></div>', unsafe_allow_html=True)
