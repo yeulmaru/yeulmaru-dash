@@ -11,9 +11,35 @@ st.set_page_config(
 from utils.auth import check_password
 check_password()
 
-st.sidebar.markdown("## 🎭 GS칼텍스 예울마루")
-st.sidebar.markdown("---")
-st.sidebar.markdown("운영실적 종합 대시보드")
+# ── 사이드바: 타이틀을 페이지 메뉴 위로 배치 (CSS order) ──
+st.markdown("""
+<style>
+section[data-testid="stSidebar"] > div:first-child {
+    display: flex;
+    flex-direction: column;
+}
+section[data-testid="stSidebar"] [data-testid="stSidebarNav"] {
+    order: 2;
+}
+.sidebar-title-block {
+    order: 1;
+    padding: 1rem 0 0 0;
+}
+/* 타이틀 아래 나머지 컨텐츠 */
+section[data-testid="stSidebar"] > div:first-child > div:not([data-testid="stSidebarNav"]):not(:has(.sidebar-title-block)) {
+    order: 3;
+}
+</style>
+""", unsafe_allow_html=True)
+
+with st.sidebar:
+    st.markdown('''
+    <div class="sidebar-title-block">
+        <h3 style="margin:0 0 4px 0;">🎭 GS칼텍스 예울마루</h3>
+        <p style="color:#aaa; margin:0 0 12px 0; font-size:0.9em;">운영실적 종합 대시보드</p>
+        <hr style="border-color:#333; margin:0 0 8px 0;">
+    </div>
+    ''', unsafe_allow_html=True)
 
 st.title("🎭 GS칼텍스 예울마루 공연 대시보드")
 
