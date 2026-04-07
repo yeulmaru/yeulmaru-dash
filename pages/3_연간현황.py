@@ -275,7 +275,7 @@ if detail_df is not None and not detail_df.empty:
         st.plotly_chart(_s1_fig, use_container_width=True)
 
         # ── 요약 영역: 좌측 지표 + 우측 장르 평균 표 ──
-        st.markdown('<div style="margin:12px 0 8px 0;border-top:1px solid #333;"></div>', unsafe_allow_html=True)
+        st.markdown('<div style="margin:24px 0 16px 0;border-top:1px solid #333;"></div>', unsafe_allow_html=True)
 
         _sum_left, _sum_right = st.columns([1, 2])
 
@@ -285,7 +285,7 @@ if detail_df is not None and not detail_df.empty:
             _avg_all = _s1_grouped['_평균점유율'].mean()
             _max_all = _s1_grouped['_평균점유율'].max()
             st.markdown(
-                f'<div style="font-size:15px;line-height:2.2;">'
+                f'<div style="font-size:15px;line-height:2.2;padding:12px 0;">'
                 f'<b>총 공연 수</b> &nbsp; <span style="color:#0FFD02;font-weight:700;">{_total_cnt}</span>건<br>'
                 f'<b>평균 점유율</b> &nbsp; <span style="color:#0FFD02;font-weight:700;">{_avg_all:.1f}</span>%<br>'
                 f'<b>최고 점유율</b> &nbsp; <span style="color:#0FFD02;font-weight:700;">{_max_all:.1f}</span>%'
@@ -310,10 +310,12 @@ if detail_df is not None and not detail_df.empty:
                     _data_cells += f'<td style="padding:6px 12px;text-align:right;color:#FFF;">{_cat_avg:.1f}</td>'
 
                 st.markdown(
+                    f'<div style="padding:12px 0 32px 0;">'
                     f'<table style="width:100%;border-collapse:collapse;font-size:14px;">'
                     f'<tr style="background:rgba(255,255,255,0.05);border-bottom:1px solid #444;">{_hdr_cells}</tr>'
                     f'<tr>{_data_cells}</tr>'
-                    f'</table>',
+                    f'</table>'
+                    f'</div>',
                     unsafe_allow_html=True,
                 )
 
