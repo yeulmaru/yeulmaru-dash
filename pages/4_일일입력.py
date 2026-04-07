@@ -31,7 +31,7 @@ save_daily_entry = save_daily_entry_cloud if _IS_CLOUD else save_daily_entry_loc
 # ── 상수 ──
 WEEKDAYS_KR = ['월', '화', '수', '목', '금', '토', '일']
 ACCENT = COLORS['primary']
-LBL_BLUE = '#00BFFF'
+LBL_BLUE = '#FFFFFF'
 KST = timezone(timedelta(hours=9))
 
 # ── 세션 초기화 ──
