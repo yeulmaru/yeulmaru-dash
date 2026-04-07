@@ -464,12 +464,17 @@ for card_idx, (_, perf) in enumerate(active_df.iterrows()):
         # ── 헤더 메타정보 (1번 구분선 위) ──
         _hdr_cur = latest_saved or {}
         _hdr_seats = int(_hdr_cur.get('합계좌석', 0) or 0)
-        _hdr_occ = (_hdr_seats / total_open * 100) if total_open > 0 else 0.0
-        _hdr_occ_i = round(_hdr_occ)
+        _hdr_occ_pct = (_hdr_seats / total_open * 100) if total_open > 0 else 0.0
+        _hdr_occ_i = round(_hdr_occ_pct)
         _hdr_tgt_i = round(target_occ)
-        _hdr_seats_s = f"{_hdr_seats:,}" if _hdr_seats >= 1000 else str(_hdr_seats)
-        _hdr_open_s = f"{total_open:,}" if total_open >= 1000 else str(total_open)
+        _hdr_need = max(0, round(total_open * target_occ / 100) - _hdr_seats)
+        _hdr_need_pct = round(_hdr_need / total_open * 100) if total_open > 0 and _hdr_need > 0 else 0
+        _hdr_avail = sum(r['seat'] for r in perf_rounds_info) if perf_rounds_info else base_seat
+        _hdr_avail_pct = round(_hdr_avail / total_open * 100) if total_open > 0 else 0
+        def _fs(n):
+            return f"{n:,}" if n >= 1000 else str(n)
         _G = "#0FFD02"
+        _Y = "#FFD700"
 
         if total_rounds <= 1 and perf_rounds_info:
             _ri0 = perf_rounds_info[0]
@@ -477,11 +482,41 @@ for card_idx, (_, perf) in enumerate(active_df.iterrows()):
         else:
             _hdr_date = date_range
 
-        ic = st.columns([3, 1, 1.5, 1], gap="small")
-        ic[0].markdown(f'<div style="font-size:21px;">공연 일시 : <span style="color:{_G};font-weight:700;">{_hdr_date}</span></div>', unsafe_allow_html=True)
-        ic[1].markdown(f'<div style="font-size:21px;"><span style="color:{_G};font-weight:700;">{total_rounds}</span> 회차</div>', unsafe_allow_html=True)
-        ic[2].markdown(f'<div style="font-size:21px;"><span style="color:{_G};font-weight:700;">{_hdr_seats_s}</span>/{_hdr_open_s}석 판매</div>', unsafe_allow_html=True)
-        ic[3].markdown(f'<div style="font-size:21px;"><span style="color:{_G};font-weight:700;">{_hdr_occ_i}%</span> to {_hdr_tgt_i}%</div>', unsafe_allow_html=True)
+        ic = st.columns([1.5, 2], gap="small")
+
+        # 좌측: 공연 일시 + 회차
+        ic[0].markdown(
+            f'<div style="font-size:21px;">공연 일시 : <span style="color:{_G};font-weight:700;">{_hdr_date}</span></div>'
+            f'<div style="font-size:17px;color:#AAA;margin-top:4px;">(총 <span style="color:{_G};font-weight:700;">{total_rounds}</span>회차)</div>',
+            unsafe_allow_html=True,
+        )
+
+        # 우측: 미니 표 (현재 / 목표 / 가용)
+        _TD = 'padding:3px 8px;'
+        _TDR = 'padding:3px 8px;text-align:right;'
+        _tbl = (
+            f'<table style="font-size:19px;border-collapse:collapse;width:100%;">'
+            f'<tr>'
+            f'<td style="{_TD}">현재</td>'
+            f'<td style="{_TDR}"><span style="color:{_G};font-weight:700;">{_fs(_hdr_seats)}</span>석</td>'
+            f'<td style="{_TDR}">-</td>'
+            f'<td style="{_TDR}"><span style="color:{_G};font-weight:700;">{_hdr_occ_i}</span>%</td>'
+            f'</tr>'
+            f'<tr>'
+            f'<td style="{_TD}">목표</td>'
+            f'<td style="{_TDR}"><span style="color:{_Y};font-weight:700;">{_fs(_hdr_need)}</span>석</td>'
+            f'<td style="{_TDR}"><span style="color:{_Y};font-weight:700;">{_hdr_need_pct}</span>%</td>'
+            f'<td style="{_TDR}"><span style="color:{_G};font-weight:700;">{_hdr_tgt_i}</span>%</td>'
+            f'</tr>'
+            f'<tr>'
+            f'<td style="{_TD}">가용</td>'
+            f'<td style="{_TDR}">{_fs(_hdr_avail)}석</td>'
+            f'<td style="{_TDR}">-</td>'
+            f'<td style="{_TDR}">{_hdr_avail_pct}%</td>'
+            f'</tr>'
+            f'</table>'
+        )
+        ic[1].markdown(_tbl, unsafe_allow_html=True)
 
         st.markdown("---")
         st.markdown('<div style="margin-bottom:8px;"></div>', unsafe_allow_html=True)
