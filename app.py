@@ -1,5 +1,4 @@
 import streamlit as st
-import os
 
 from utils.charts import ACCENT_COLOR
 
@@ -32,19 +31,6 @@ GS칼텍스 예울마루의 공연 운영실적 대시보드입니다.
 
 ---
 """)
-
-try:
-    from utils.data_loader import get_data_filepath
-    filepath = get_data_filepath()
-    if filepath and os.path.exists(filepath):
-        import datetime
-        mtime = os.path.getmtime(filepath)
-        dt = datetime.datetime.fromtimestamp(mtime).strftime('%Y-%m-%d %H:%M:%S')
-        st.info(f"💡 현재 연결된 데이터 파일: `{os.path.basename(filepath)}` (마지막 수정: {dt})")
-    else:
-        st.warning("⚠️ `data/` 폴더 내에 엑셀 데이터 파일이 존재하지 않습니다.")
-except Exception as e:
-    pass
 
 st.markdown(f"""
 <style>
