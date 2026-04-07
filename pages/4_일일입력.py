@@ -493,75 +493,70 @@ for card_idx, (_, perf) in enumerate(active_df.iterrows()):
         in_seats = sum(r['합계좌석'] for r in round_results)
         in_amount = sum(r['합계금액'] for r in round_results)
 
-        # 표시값: 입력 있으면 current + input (누적 시뮬), 없으면 current만
-        if has_input_data:
-            d_paid = cur_paid + in_paid
-            d_free = cur_free + in_free
-            d_seats = cur_seats + in_seats
-            d_amount = cur_amount + in_amount
-            d_occ = (d_seats / total_open * 100) if total_open > 0 else 0.0
-            d_vs_tgt = d_occ - target_occ
-            # delta = 입력값 그대로 (추가분)
-            delta_seats = in_seats
-            delta_amount = in_amount
-            delta_occ = d_occ - cur_occ
-        else:
-            d_paid, d_free, d_seats, d_amount = cur_paid, cur_free, cur_seats, cur_amount
-            d_occ, d_vs_tgt = cur_occ, cur_vs_tgt
-            delta_seats, delta_amount, delta_occ = 0, 0, 0.0
+        # ── 비교 표 (이전 갱신 / 현재 / 변경) ──
+        # 이전 갱신 값 (전일 데이터)
+        _p = prev  # _match_prev 결과 (전일)
+        _p_seats = int(_p.get('합계좌석', 0)) if _p else None
+        _p_amount = int(_p.get('합계금액', 0)) if _p else None
+        _p_occ = (_p_seats / total_open * 100) if _p and total_open > 0 else None
+        _p_vs_tgt = (_p_occ - target_occ) if _p_occ is not None else None
+        _p_label = _fmt_date_wd(prev_date) if prev_date and _p else "최초입력"
 
-        def _delta_html(val, fmt_fn, show):
-            if not show or val == 0:
-                return ""
-            color = ACCENT if val > 0 else "#FF4B4B"
-            sign = "▲ +" if val > 0 else "▼ "
-            return (f'<div style="font-size:22px;color:{color};font-weight:700;'
-                    f'margin-top:12px;line-height:1.1;">{sign}{fmt_fn(abs(val))}</div>')
+        # 입력값 점유율
+        in_occ = (in_seats / total_open * 100) if total_open > 0 else 0.0
+
+        _S = 'font-size:13px;color:#888;'
+        _V_PREV = 'font-size:18px;color:#888;'
+        _V_CUR = f'font-size:22px;font-weight:700;color:{ACCENT};'
+        _LBL = 'font-size:13px;font-weight:600;'
 
         st.markdown("---")
-        mc = st.columns(4)
 
-        with mc[0]:
-            st.markdown(
-                f'<div style="color:#AAA;font-size:13px;">누적</div>'
-                f'<div style="font-size:28px;font-weight:700;color:{ACCENT};line-height:1.2;">'
-                f'{d_seats:,}석</div>'
-                f'<div style="font-size:14px;color:#AAA;margin-top:2px;">유료 {d_paid:,} + 무료 {d_free:,}</div>'
-                + _delta_html(delta_seats, lambda v: f"{v:,}석", has_input_data),
-                unsafe_allow_html=True,
-            )
+        # 헤더
+        _hc = st.columns([1.2, 1.5, 1.5, 1, 1.2])
+        _hc[0].markdown("")
+        _hc[1].markdown(f'<div style="{_S}">누적</div>', unsafe_allow_html=True)
+        _hc[2].markdown(f'<div style="{_S}">판매금액</div>', unsafe_allow_html=True)
+        _hc[3].markdown(f'<div style="{_S}">점유율</div>', unsafe_allow_html=True)
+        _hc[4].markdown(f'<div style="{_S}">목표대비</div>', unsafe_allow_html=True)
 
-        with mc[1]:
-            st.markdown(
-                f'<div style="color:#AAA;font-size:13px;">판매금액</div>'
-                f'<div style="font-size:28px;font-weight:700;color:{ACCENT};line-height:1.2;">'
-                f'{d_amount/10000:,.1f}만원</div>'
-                f'<div style="font-size:14px;color:#AAA;margin-top:2px;">&nbsp;</div>'
-                + _delta_html(delta_amount, lambda v: f"{v/10000:,.1f}만원", has_input_data),
-                unsafe_allow_html=True,
-            )
+        # 이전 갱신 행
+        _r1 = st.columns([1.2, 1.5, 1.5, 1, 1.2])
+        _r1[0].markdown(f'<div style="{_LBL}color:#888;">{_p_label}</div>', unsafe_allow_html=True)
+        if _p:
+            _pv_sign = "+" if _p_vs_tgt >= 0 else ""
+            _r1[1].markdown(f'<div style="{_V_PREV}">{_p_seats:,}석</div>', unsafe_allow_html=True)
+            _r1[2].markdown(f'<div style="{_V_PREV}">{_p_amount/10000:,.1f}만원</div>', unsafe_allow_html=True)
+            _r1[3].markdown(f'<div style="{_V_PREV}">{_p_occ:.1f}%</div>', unsafe_allow_html=True)
+            _r1[4].markdown(f'<div style="{_V_PREV}">{_pv_sign}{_p_vs_tgt:.1f}%p</div>', unsafe_allow_html=True)
+        else:
+            for _cc in _r1[1:]:
+                _cc.markdown(f'<div style="{_V_PREV}">—</div>', unsafe_allow_html=True)
 
-        with mc[2]:
-            st.markdown(
-                f'<div style="color:#AAA;font-size:13px;">점유율</div>'
-                f'<div style="font-size:28px;font-weight:700;color:{ACCENT};line-height:1.2;">'
-                f'{d_occ:.1f}%</div>'
-                f'<div style="font-size:14px;color:#AAA;margin-top:2px;">{d_seats:,} / {total_open:,}석</div>'
-                + _delta_html(delta_occ, lambda v: f"{v:.1f}%p", has_input_data),
-                unsafe_allow_html=True,
-            )
+        # 현재 행 (DB 마지막 저장값, 입력 반영 안 함)
+        _r2 = st.columns([1.2, 1.5, 1.5, 1, 1.2])
+        _r2[0].markdown(f'<div style="{_LBL}color:#FFF;">현재</div>', unsafe_allow_html=True)
+        _r2[1].markdown(f'<div style="{_V_CUR}">{cur_seats:,}석</div>', unsafe_allow_html=True)
+        _r2[2].markdown(f'<div style="{_V_CUR}">{cur_amount/10000:,.1f}만원</div>', unsafe_allow_html=True)
+        _r2[3].markdown(f'<div style="{_V_CUR}">{cur_occ:.1f}%</div>', unsafe_allow_html=True)
+        _cv_sign = "+" if cur_vs_tgt >= 0 else ""
+        _cv_color = ACCENT if cur_vs_tgt >= 0 else "#FF4B4B"
+        _r2[4].markdown(f'<div style="font-size:22px;font-weight:700;color:{_cv_color};">{_cv_sign}{cur_vs_tgt:.1f}%p</div>', unsafe_allow_html=True)
 
-        with mc[3]:
-            tgt_color = ACCENT if d_vs_tgt >= 0 else "#FF4B4B"
-            vs_sign = "+" if d_vs_tgt >= 0 else ""
-            st.markdown(
-                f'<div style="color:#AAA;font-size:13px;">목표 대비</div>'
-                f'<div style="font-size:28px;font-weight:700;color:{tgt_color};line-height:1.2;">'
-                f'{vs_sign}{d_vs_tgt:.1f}%p</div>'
-                f'<div style="font-size:14px;color:#AAA;margin-top:2px;">목표: {target_occ}%</div>'
-                + _delta_html(delta_occ, lambda v: f"{v:.1f}%p", has_input_data),
-                unsafe_allow_html=True,
-            )
+        # 변경 행 (입력 있을 때만)
+        if has_input_data:
+            _r3 = st.columns([1.2, 1.5, 1.5, 1, 1.2])
+            _r3[0].markdown(f'<div style="{_LBL}color:#FFD700;">(변경)</div>', unsafe_allow_html=True)
+
+            def _chg_html(val, fmt_str):
+                _c = ACCENT if val >= 0 else "#FF4B4B"
+                _s = "▲ +" if val > 0 else ("▼ " if val < 0 else "")
+                return f'<div style="font-size:18px;font-weight:700;color:{_c};">{_s}{fmt_str}</div>'
+
+            _r3[1].markdown(_chg_html(in_seats, f"{in_seats:,}석"), unsafe_allow_html=True)
+            _r3[2].markdown(_chg_html(in_amount, f"{in_amount/10000:,.1f}만원"), unsafe_allow_html=True)
+            _r3[3].markdown(_chg_html(in_occ, f"{in_occ:.1f}%p"), unsafe_allow_html=True)
+            _r3[4].markdown(_chg_html(in_occ, f"{in_occ:.1f}%p"), unsafe_allow_html=True)
 
         # ── 카드별 저장 버튼 ──
         # 호환성 alias (혹시 다른 코드에서 쓸 경우)
