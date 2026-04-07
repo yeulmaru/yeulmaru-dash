@@ -184,14 +184,14 @@ if detail_df is not None and not detail_df.empty:
                 tickmode='array',
                 tickvals=list(range(1, 13)),
                 ticktext=[f'{m}월' for m in range(1, 13)],
-                range=[0.5, 12.5],
+                range=[0.5, 13.0],
             ),
             yaxis=dict(
                 title='',
                 range=[0, 110],
             ),
             height=500,
-            margin=dict(t=40, r=55),
+            margin=dict(t=40, r=130),
             showlegend=True,
             legend=dict(
                 orientation='h',
@@ -203,17 +203,30 @@ if detail_df is not None and not detail_df.empty:
                 bgcolor='rgba(0,0,0,0)',
                 title_text='',
             ),
-            annotations=[dict(
-                text='(%)',
-                x=0,
-                y=1.04,
-                xref='paper',
-                yref='paper',
-                showarrow=False,
-                xanchor='left',
-                yanchor='bottom',
-                font=dict(color='#FFFFFF', size=13),
-            )],
+            annotations=[
+                dict(
+                    text='(%)',
+                    x=0,
+                    y=1.04,
+                    xref='paper',
+                    yref='paper',
+                    showarrow=False,
+                    xanchor='left',
+                    yanchor='bottom',
+                    font=dict(color='#FFFFFF', size=13),
+                ),
+                dict(
+                    text='(%)',
+                    x=13.1,
+                    y=105,
+                    xref='x',
+                    yref='y',
+                    showarrow=False,
+                    xanchor='left',
+                    yanchor='bottom',
+                    font=dict(color='#FFFFFF', size=11),
+                ),
+            ],
         )
         # ── 카테고리별 평균 점선 + 우측 수치 ──
         _avg_annotations = []
@@ -225,7 +238,7 @@ if detail_df is not None and not detail_df.empty:
             _avg = _cat_df['_평균점유율'].mean()
 
             _s1_fig.add_shape(
-                type='line', x0=0.5, x1=12.5, y0=_avg, y1=_avg,
+                type='line', x0=0.5, x1=13.0, y0=_avg, y1=_avg,
                 line=dict(dash='dash', color=_color, width=1.5),
                 opacity=0.5,
             )
@@ -237,13 +250,23 @@ if detail_df is not None and not detail_df.empty:
                     _adj_y = _uy + 3
             _used_y.append(_adj_y)
 
+            # 큰 숫자
             _avg_annotations.append(dict(
-                x=1.01, y=_adj_y,
-                xref='paper', yref='y',
-                text=f"{_avg:.1f}",
+                x=13.1, y=_adj_y,
+                xref='x', yref='y',
+                text=f"{_avg:.0f}",
                 showarrow=False,
                 xanchor='left', yanchor='middle',
-                font=dict(color=_color, size=12),
+                font=dict(color=_color, size=13),
+            ))
+            # 작은 카테고리명
+            _avg_annotations.append(dict(
+                x=13.1, y=_adj_y - 2.5,
+                xref='x', yref='y',
+                text=f"({_cat})",
+                showarrow=False,
+                xanchor='left', yanchor='middle',
+                font=dict(color=_color, size=9),
             ))
 
         # 기존 annotations에 평균 annotations 추가
