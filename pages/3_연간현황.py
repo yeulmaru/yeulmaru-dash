@@ -69,6 +69,7 @@ if detail_df is not None and not detail_df.empty:
     _s1_year_df = _s1_df[_s1_df['_년도'] == _s1_selected_year]
 
     # ── 분류(공연구분) 체크박스 (최소 1개 강제) ──
+    _s1_sel_final = []
     if _s1_perf_type_col:
         _s1_types = sorted(_s1_year_df[_s1_perf_type_col].dropna().astype(str).str.strip().unique())
 
@@ -101,6 +102,7 @@ if detail_df is not None and not detail_df.empty:
         st.info("해당 연도/분류 데이터가 없습니다.")
     else:
         _s1_genre_col = '장르1' if '장르1' in _s1_year_df.columns else '세부\n장르'
+        _s1_type_col = _s1_perf_type_col if _s1_perf_type_col else '공연\n구분'
         _s1_grouped = _s1_year_df.groupby('공연명').agg(
             _평균점유율=('_점유율', 'mean'),
             _종료일=('_날짜', 'max'),
@@ -109,7 +111,9 @@ if detail_df is not None and not detail_df.empty:
             _오픈합계=('기본\n좌석', 'sum'),
             _회차수=('공연명', 'count'),
             _장르=(_s1_genre_col, 'first'),
+            _공연구분=(_s1_type_col, 'first'),
         ).reset_index()
+        _s1_grouped['_공연구분'] = _s1_grouped['_공연구분'].astype(str).str.strip()
 
         # X축: 종료일 기준 월 위치
         _s1_grouped['_월위치'] = _s1_grouped['_종료일'].dt.month + (_s1_grouped['_종료일'].dt.day - 1) / 31
@@ -122,19 +126,33 @@ if detail_df is not None and not detail_df.empty:
 
         _GENRE_COLORS = {
             '클래식': '#0FFD02',
-            '뮤지컬': '#FF00FF',
+            '뮤지컬': '#00BFFF',
             '대중': '#00FFFF',
             '발레/연극': '#FFFF00',
             '어린이': '#FF6EC7',
             '기타': '#B0B0B0',
         }
+        _TYPE_COLORS = {
+            '기획': '#0FFD02',
+            '대관': '#FFFF00',
+            '기타': '#FF6EC7',
+        }
+
+        _s1_multi = len(_s1_sel_final) > 1
+        if _s1_multi:
+            _s1_color_col = '_공연구분'
+            _s1_color_map = _TYPE_COLORS
+        else:
+            _s1_color_col = '_장르'
+            _s1_color_map = _GENRE_COLORS
+
         _s1_fig = px.scatter(
             _s1_grouped,
             x='_월위치',
             y='_평균점유율',
-            color='_장르',
+            color=_s1_color_col,
             custom_data=['공연명', '_장르', '_날짜포맷', '_유료합계', '_평균점유율'],
-            color_discrete_map=_GENRE_COLORS,
+            color_discrete_map=_s1_color_map,
         )
         _s1_fig.update_traces(
             marker=dict(size=10, opacity=0.7, line=dict(width=1, color='#FFFFFF')),
