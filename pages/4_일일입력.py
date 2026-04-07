@@ -90,6 +90,17 @@ div.stButton > button[kind="primary"]:focus:not(:active) {
     border-radius: 4px;
     padding: 2px 0;
 }
+/* 회차 테이블 행 정렬: 부모 flex center + 빈 label 제거 + margin 0 */
+.round-table-wrap div[data-testid="stHorizontalBlock"] {
+    align-items: center !important;
+}
+.round-table-wrap div[data-testid="stNumberInput"] label {
+    display: none !important;
+}
+.round-table-wrap div[data-testid="stNumberInput"] {
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -549,6 +560,7 @@ for card_idx, (_, perf) in enumerate(active_df.iterrows()):
         round_results = []
 
         if total_rounds > 1 and perf_rounds_info:
+            st.markdown('<div class="round-table-wrap">', unsafe_allow_html=True)
             st.markdown('<div class="header-row-bg"></div>', unsafe_allow_html=True)
             _h = st.columns([0.4, 0.9, 0.6, 0.8, 0.8, 0.8])
             _h[0].markdown(f'<div style="font-size:21px;font-weight:700;text-align:center;color:{LBL_BLUE};">#</div>', unsafe_allow_html=True)
@@ -574,6 +586,8 @@ for card_idx, (_, perf) in enumerate(active_df.iterrows()):
                     (cols[3], cols[4], cols[5]),
                 )
                 round_results.append(result)
+
+            st.markdown('</div>', unsafe_allow_html=True)  # close .round-table-wrap
 
             missing = [perf_rounds_info[i]['round_no']
                        for i, r in enumerate(round_results) if not r['has_input']]
