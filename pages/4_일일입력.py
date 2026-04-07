@@ -493,9 +493,9 @@ for card_idx, (_, perf) in enumerate(active_df.iterrows()):
         )
 
         # 우측: 미니 표 (전치: 2행×5열)
-        _TD = 'padding:3px 6px;'
-        _TDR = 'padding:3px 6px;text-align:right;'
-        _TDH = 'padding:3px 6px;text-align:right;color:#999;font-size:15px;'
+        _TD = 'padding:3px 12px;'
+        _TDR = 'padding:3px 12px;text-align:right;'
+        _TDH = 'padding:3px 12px;text-align:center;color:#FFFFFF;font-weight:700;font-size:15px;'
         _DIM = '#999999'
         def _sign(n):
             return f"+{n:,}" if n > 0 else (f"{n:,}" if n < 0 else "0")
@@ -511,14 +511,14 @@ for card_idx, (_, perf) in enumerate(active_df.iterrows()):
             f'<td style="{_TDH}">목표대비</td>'
             f'</tr>'
             f'<tr>'
-            f'<td style="{_TD}">객석</td>'
+            f'<td style="{_TD}">객석 (수)</td>'
             f'<td style="{_TDR}"><span style="color:{_G};font-weight:700;">{_fs(_hdr_seats)}</span></td>'
             f'<td style="{_TDR}"><span style="color:{_Y};font-weight:700;">{_fs(_hdr_tgt_seats)}</span></td>'
             f'<td style="{_TDR}">{_fs(_hdr_avail)}</td>'
             f'<td style="{_TDR}"><span style="color:{_diff_s_color};font-weight:700;">{_sign(_hdr_diff_seats)}</span></td>'
             f'</tr>'
             f'<tr>'
-            f'<td style="{_TD}">점유율%</td>'
+            f'<td style="{_TD}">점유율 (%)</td>'
             f'<td style="{_TDR}"><span style="color:{_G};font-weight:700;">{_hdr_occ_i}</span></td>'
             f'<td style="{_TDR}"><span style="color:{_Y};font-weight:700;">{_hdr_tgt_i}</span></td>'
             f'<td style="{_TDR}">{_hdr_avail_pct}</td>'
@@ -673,7 +673,7 @@ for card_idx, (_, perf) in enumerate(active_df.iterrows()):
             _new_occ = (_new_seats / total_open * 100) if total_open > 0 else 0.0
             _new_vs_tgt = _new_occ - target_occ
             _rp = st.columns(_COL_RATIO)
-            _rp[1].markdown(f'<div style="{_LBL}color:{ACCENT};">+변경</div>', unsafe_allow_html=True)
+            _rp[1].markdown(f'<div style="{_LBL}color:{ACCENT};">변경 후</div>', unsafe_allow_html=True)
             _rp[2].markdown(f'<div style="{_V_CUR}">{_new_seats:,}석</div>', unsafe_allow_html=True)
             _rp[3].markdown(f'<div style="{_V_CUR}">{_new_amount/10000:,.1f}만원</div>', unsafe_allow_html=True)
             _rp[4].markdown(f'<div style="{_V_CUR}">{_new_occ:.1f}%</div>', unsafe_allow_html=True)
