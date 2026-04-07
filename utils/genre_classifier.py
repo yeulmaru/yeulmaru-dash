@@ -44,7 +44,7 @@ def classify_genre1(row):
 
     # Step 3: 어린이 화이트리스트
     if any(kw in name for kw in KIDS_KW):
-        return '어린이'
+        return '어린이·가족'
 
     # Step 4: 성인 뮤지컬 블랙리스트
     detail = str(row.get('세부장르', '')).strip() if row.get('세부장르') else ''

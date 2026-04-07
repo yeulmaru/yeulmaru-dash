@@ -137,7 +137,7 @@ if detail_df is not None and not detail_df.empty:
             '뮤지컬': '#00BFFF',
             '대중': '#00FFFF',
             '발레/연극': '#FFFF00',
-            '어린이': '#FF6EC7',
+            '어린이·가족': '#FF6EC7',
             '기타': '#B0B0B0',
         }
         _TYPE_COLORS = {
@@ -154,7 +154,7 @@ if detail_df is not None and not detail_df.empty:
             _s1_color_col = '_장르'
             _s1_color_map = _GENRE_COLORS
 
-        _GENRE_ORDER = ['클래식', '뮤지컬', '어린이', '발레/연극', '대중', '기타']
+        _GENRE_ORDER = ['클래식', '뮤지컬', '어린이·가족', '발레/연극', '대중', '기타']
         _TYPE_ORDER = ['기획', '대관', '기타']
         _s1_cat_orders = {_s1_color_col: _TYPE_ORDER if _s1_multi else _GENRE_ORDER}
 
