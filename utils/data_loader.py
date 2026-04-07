@@ -244,7 +244,7 @@ def match_performance(perf_name, master_df):
     perf_name_s = str(perf_name).strip()
     for _, row in master_df.iterrows():
         master_name = str(row['사업명']).strip()
-        if perf_name_s == master_name or perf_name_s in master_name or master_name in perf_name_s:
+        if perf_name_s == master_name:
             return row
     return None
 

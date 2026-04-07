@@ -94,7 +94,7 @@ def _match_master(perf_name, master_df):
     perf_name_s = str(perf_name).strip()
     for _, mr in master_df.iterrows():
         master_name = str(mr['사업명']).strip()
-        if perf_name_s == master_name or perf_name_s in master_name or master_name in perf_name_s:
+        if perf_name_s == master_name:
             return mr
     return None
 
@@ -756,7 +756,7 @@ if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in 
             master_name = str(mr['사업명']).strip()
             for tn in trend_df['공연명'].unique():
                 tn_s = str(tn).strip()
-                if tn_s == master_name or tn_s in master_name or master_name in tn_s:
+                if tn_s == master_name:
                     _active_perf_names.append(tn)
                     break
 
@@ -766,7 +766,7 @@ if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in 
             for tn in trend_df['공연명'].unique():
                 tn_s = str(tn).strip()
                 aname_s = str(aname).strip()
-                if tn_s == aname_s or tn_s in aname_s or aname_s in tn_s:
+                if tn_s == aname_s:
                     _active_perf_names_set.add(tn)
                     break
         _active_perf_names = list(_active_perf_names_set)

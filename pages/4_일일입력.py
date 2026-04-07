@@ -202,7 +202,7 @@ def _load_latest_for_perf(trend_df, perf_name, base_date_ts):
     tdf = tdf[tdf['기준일자'] <= base_date_ts]
     perf_s = str(perf_name).strip()
     mask = tdf['공연명'].astype(str).apply(
-        lambda x: x.strip() == perf_s or perf_s in x.strip() or x.strip() in perf_s
+        lambda x: x.strip() == perf_s
     )
     perf_df = tdf[mask]
     if perf_df.empty:
@@ -234,7 +234,7 @@ def _load_prev_for_perf(trend_df, perf_name, base_date_ts):
     tdf = tdf[tdf['기준일자'] <= base_date_ts]
     perf_s = str(perf_name).strip()
     mask = tdf['공연명'].astype(str).apply(
-        lambda x: x.strip() == perf_s or perf_s in x.strip() or x.strip() in perf_s
+        lambda x: x.strip() == perf_s
     )
     perf_df = tdf[mask]
     if len(perf_df) < 2:
@@ -321,7 +321,7 @@ def _dday_badge(start_dt, today_ts):
 def _match_prev(perf_name, prev_data):
     perf_s = str(perf_name).strip()
     for key, val in prev_data.items():
-        if perf_s == key or perf_s in key or key in perf_s:
+        if perf_s == key:
             return val
     return None
 
@@ -329,7 +329,7 @@ def _match_prev(perf_name, prev_data):
 def _match_today(perf_name, today_data):
     perf_s = str(perf_name).strip()
     for key, val in today_data.items():
-        if perf_s == key or perf_s in key or key in perf_s:
+        if perf_s == key:
             return val
     return None
 

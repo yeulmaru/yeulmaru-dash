@@ -129,7 +129,7 @@ def _find_matching_row(ws, header_row, date_int, perf_name, round_time):
 
         b = ws.cell(row=r, column=2).value
         b_str = str(b).strip() if b else ""
-        if not (b_str == perf_s or perf_s in b_str or b_str in perf_s):
+        if not (b_str == perf_s):
             continue
 
         d = ws.cell(row=r, column=4).value
