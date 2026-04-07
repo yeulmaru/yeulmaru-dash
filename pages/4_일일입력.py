@@ -567,7 +567,7 @@ for card_idx, (_, perf) in enumerate(active_df.iterrows()):
 
         st.markdown('<div style="margin-top:20px;"></div>', unsafe_allow_html=True)
         st.markdown("---")
-        st.markdown('<div style="padding:0 24px 20px 24px;">', unsafe_allow_html=True)
+        st.markdown('<div style="padding:0 80px 20px 80px;">', unsafe_allow_html=True)
 
         # 헤더
         _hc = st.columns([1.2, 1.5, 1.5, 1, 1.2])
