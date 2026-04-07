@@ -459,6 +459,8 @@ for card_idx, (_, perf) in enumerate(active_df.iterrows()):
             f'<div style="margin-bottom:16px;"></div>',
             unsafe_allow_html=True,
         )
+        st.markdown('<div style="margin-top:20px;"></div>', unsafe_allow_html=True)
+        st.markdown("---")
 
         ic = st.columns(4)
         ic[0].markdown(f'<div style="font-size:21px;"><b>공연일</b> &nbsp; {date_range}</div>', unsafe_allow_html=True)
