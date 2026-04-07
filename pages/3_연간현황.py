@@ -252,11 +252,48 @@ if detail_df is not None and not detail_df.empty:
         _s1_fig = apply_common_layout(_s1_fig)
         st.plotly_chart(_s1_fig, use_container_width=True)
 
-        # 요약 지표 (그룹 기준)
-        _s1_c1, _s1_c2, _s1_c3 = st.columns(3)
-        _s1_c1.metric("총 공연 수", f"{len(_s1_grouped)}건")
-        _s1_c2.metric("평균 점유율", f"{_s1_grouped['_평균점유율'].mean():.1f}%")
-        _s1_c3.metric("최고 점유율", f"{_s1_grouped['_평균점유율'].max():.1f}%")
+        # ── 요약 영역: 좌측 지표 + 우측 장르 평균 표 ──
+        st.markdown('<div style="margin:12px 0 8px 0;border-top:1px solid #333;"></div>', unsafe_allow_html=True)
+
+        _sum_left, _sum_right = st.columns([1, 2])
+
+        # 좌측: 요약 3개
+        with _sum_left:
+            _total_cnt = len(_s1_grouped)
+            _avg_all = _s1_grouped['_평균점유율'].mean()
+            _max_all = _s1_grouped['_평균점유율'].max()
+            st.markdown(
+                f'<div style="font-size:15px;line-height:2.2;">'
+                f'<b>총 공연 수</b> &nbsp; <span style="color:#0FFD02;font-weight:700;">{_total_cnt}</span>건<br>'
+                f'<b>평균 점유율</b> &nbsp; <span style="color:#0FFD02;font-weight:700;">{_avg_all:.1f}</span>%<br>'
+                f'<b>최고 점유율</b> &nbsp; <span style="color:#0FFD02;font-weight:700;">{_max_all:.1f}</span>%'
+                f'</div>',
+                unsafe_allow_html=True,
+            )
+
+        # 우측: 카테고리별 평균 점유율 표
+        with _sum_right:
+            _order = (_TYPE_ORDER if _s1_multi else _GENRE_ORDER)
+            _active_cats = [c for c in _order if c in _s1_grouped[_s1_color_col].values]
+
+            if _active_cats:
+                _hdr_cells = '<td style="padding:6px 12px;font-weight:700;color:#AAA;"></td>'
+                for _ac in _active_cats:
+                    _hc = _s1_color_map.get(_ac, '#FFF')
+                    _hdr_cells += f'<td style="padding:6px 12px;text-align:center;font-weight:700;color:{_hc};">{_ac}</td>'
+
+                _data_cells = '<td style="padding:6px 12px;font-weight:600;color:#FFF;">평균 점유율 (%)</td>'
+                for _ac in _active_cats:
+                    _cat_avg = _s1_grouped[_s1_grouped[_s1_color_col] == _ac]['_평균점유율'].mean()
+                    _data_cells += f'<td style="padding:6px 12px;text-align:right;color:#FFF;">{_cat_avg:.1f}</td>'
+
+                st.markdown(
+                    f'<table style="width:100%;border-collapse:collapse;font-size:14px;">'
+                    f'<tr style="background:rgba(255,255,255,0.05);border-bottom:1px solid #444;">{_hdr_cells}</tr>'
+                    f'<tr>{_data_cells}</tr>'
+                    f'</table>',
+                    unsafe_allow_html=True,
+                )
 
         # ── 공연 목록 표 (st.dataframe) ──
         _s1_tbl = _s1_grouped.copy()  # already sorted by _종료일
