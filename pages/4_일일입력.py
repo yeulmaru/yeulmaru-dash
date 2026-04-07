@@ -802,12 +802,6 @@ st.markdown("---")
 
 has_any = any(c['any_input'] for c in all_cards)
 input_cards = [c for c in all_cards if c['any_input']]
-no_input_cards = [c for c in all_cards if not c['any_input']]
-
-if no_input_cards:
-    names = ", ".join(str(c['perf']['사업명']).strip()[:15] for c in no_input_cards)
-    st.caption(f"미입력 공연: {names}")
-
 if has_any:
     if st.button("📤 모두 저장", type="primary", use_container_width=True, key="save_all"):
         # 다회차 미입력 검증
@@ -863,13 +857,6 @@ if has_any:
                         st.error("문서가 현재 사용 중에 있습니다. 잠시 후에 시도해주세요.")
                         break
             st.rerun()
-else:
-    st.markdown(
-        '<div style="text-align:center;color:#555;padding:20px;">'
-        '입력된 데이터가 없습니다. 위 카드에서 판매 데이터를 입력해주세요.</div>',
-        unsafe_allow_html=True,
-    )
-
 # 5초 이상 지난 저장 결과는 제거 (메모리 정리)
 _now = time.time()
 st.session_state.save_results = [
