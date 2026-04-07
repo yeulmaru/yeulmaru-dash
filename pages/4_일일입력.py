@@ -666,6 +666,21 @@ for card_idx, (_, perf) in enumerate(active_df.iterrows()):
                 for _cc in _r1[2:6]:
                     _cc.markdown(f'<div style="{_V_PREV}">—</div>', unsafe_allow_html=True)
 
+        # 변경 미리보기 행 (입력값이 있을 때만)
+        if has_input_data:
+            _new_seats = cur_seats + in_seats
+            _new_amount = cur_amount + in_amount
+            _new_occ = (_new_seats / total_open * 100) if total_open > 0 else 0.0
+            _new_vs_tgt = _new_occ - target_occ
+            _rp = st.columns(_COL_RATIO)
+            _rp[1].markdown(f'<div style="{_LBL}color:{ACCENT};">+변경</div>', unsafe_allow_html=True)
+            _rp[2].markdown(f'<div style="{_V_CUR}">{_new_seats:,}석</div>', unsafe_allow_html=True)
+            _rp[3].markdown(f'<div style="{_V_CUR}">{_new_amount/10000:,.1f}만원</div>', unsafe_allow_html=True)
+            _rp[4].markdown(f'<div style="{_V_CUR}">{_new_occ:.1f}%</div>', unsafe_allow_html=True)
+            _nv_sign = "+" if _new_vs_tgt >= 0 else ""
+            _nv_color = ACCENT if _new_vs_tgt >= 0 else "#FF4B4B"
+            _rp[5].markdown(f'<div style="{_V_CHG}color:{_nv_color};">{_nv_sign}{_new_vs_tgt:.1f}%p</div>', unsafe_allow_html=True)
+
         st.markdown('<div style="margin-bottom:20px;"></div>', unsafe_allow_html=True)
 
         # ── 카드별 저장 버튼 ──
