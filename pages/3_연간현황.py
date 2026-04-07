@@ -90,19 +90,18 @@ if detail_df is not None and not detail_df.empty:
             is_disabled = _s1_only_one and is_checked
             _s1_cb_cols[i].checkbox(t, value=is_checked, key=f'_s1_cb_{t}', disabled=is_disabled)
 
-        # 체크박스 분류별 색상 CSS
+        # 체크박스 라벨 색상 (선택 상태에 따라 동적 변경)
         _CB_COLORS = {'기획': '#0FFD02', '대관': '#FFFF00', '기타': '#FF6EC7'}
         _cb_css_parts = []
         for _t in _s1_types:
-            _cc = _CB_COLORS.get(_t, '#FFFFFF')
+            _is_on = st.session_state.get(f'_s1_cb_{_t}', False)
+            _label_color = _CB_COLORS.get(_t, '#FFFFFF') if _is_on else '#FFFFFF'
             _k = f'_s1_cb_{_t}'
             _cb_css_parts.append(f'''
+            div[data-testid="stCheckbox"][data-key="{_k}"] label p,
             div[data-testid="stCheckbox"][data-key="{_k}"] label span[data-testid="stCheckboxLabel"] {{
-                color: {_cc} !important;
-            }}
-            div[data-testid="stCheckbox"][data-key="{_k}"] label span[role="checkbox"][aria-checked="true"] {{
-                background-color: {_cc} !important;
-                border-color: {_cc} !important;
+                color: {_label_color} !important;
+                font-weight: 700 !important;
             }}
             ''')
         st.markdown(f'<style>{"".join(_cb_css_parts)}</style>', unsafe_allow_html=True)
@@ -131,6 +130,7 @@ if detail_df is not None and not detail_df.empty:
             _공연구분=(_s1_type_col, 'first'),
         ).reset_index()
         _s1_grouped['_공연구분'] = _s1_grouped['_공연구분'].astype(str).str.strip()
+        _s1_grouped = _s1_grouped.sort_values('_종료일').reset_index(drop=True)
 
         # X축: 종료일 기준 월 위치
         _s1_grouped['_월위치'] = _s1_grouped['_종료일'].dt.month + (_s1_grouped['_종료일'].dt.day - 1) / 31
@@ -228,7 +228,7 @@ if detail_df is not None and not detail_df.empty:
         _s1_c3.metric("최고 점유율", f"{_s1_grouped['_평균점유율'].max():.1f}%")
 
         # ── 공연 목록 표 (st.dataframe) ──
-        _s1_tbl = _s1_grouped.sort_values('_종료일').copy()
+        _s1_tbl = _s1_grouped.copy()  # already sorted by _종료일
 
         def _fmt_date_range(row):
             s, e = row['_시작일'], row['_종료일']
