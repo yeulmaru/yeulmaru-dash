@@ -83,28 +83,20 @@ if detail_df is not None and not detail_df.empty:
         _s1_selected = [t for t in _s1_types if st.session_state.get(f'_s1_cb_{t}', False)]
         _s1_only_one = len(_s1_selected) == 1
 
-        # 체크박스 가로 배치
+        # 체크박스 가로 배치 + 컬러 바 인디케이터
+        _CB_COLORS = {'기획': '#0FFD02', '대관': '#FFFF00', '기타': '#FF6EC7'}
         _s1_cb_cols = st.columns(len(_s1_types))
         for i, t in enumerate(_s1_types):
             is_checked = st.session_state.get(f'_s1_cb_{t}', False)
             is_disabled = _s1_only_one and is_checked
-            _s1_cb_cols[i].checkbox(t, value=is_checked, key=f'_s1_cb_{t}', disabled=is_disabled)
-
-        # 체크박스 라벨 색상 (선택 상태에 따라 동적 변경)
-        _CB_COLORS = {'기획': '#0FFD02', '대관': '#FFFF00', '기타': '#FF6EC7'}
-        _cb_css_parts = []
-        for _t in _s1_types:
-            _is_on = st.session_state.get(f'_s1_cb_{_t}', False)
-            _label_color = _CB_COLORS.get(_t, '#FFFFFF') if _is_on else '#FFFFFF'
-            _k = f'_s1_cb_{_t}'
-            _cb_css_parts.append(f'''
-            div[data-testid="stCheckbox"][data-key="{_k}"] label p,
-            div[data-testid="stCheckbox"][data-key="{_k}"] label span[data-testid="stCheckboxLabel"] {{
-                color: {_label_color} !important;
-                font-weight: 700 !important;
-            }}
-            ''')
-        st.markdown(f'<style>{"".join(_cb_css_parts)}</style>', unsafe_allow_html=True)
+            with _s1_cb_cols[i]:
+                st.checkbox(t, value=is_checked, key=f'_s1_cb_{t}', disabled=is_disabled)
+                _bar_color = _CB_COLORS.get(t, '#555') if is_checked else '#333'
+                st.markdown(
+                    f'<div style="height:3px;background:{_bar_color};border-radius:2px;'
+                    f'margin-top:-10px;margin-bottom:4px;"></div>',
+                    unsafe_allow_html=True,
+                )
 
         # 필터 적용
         _s1_sel_final = [t for t in _s1_types if st.session_state.get(f'_s1_cb_{t}', False)]
@@ -163,6 +155,10 @@ if detail_df is not None and not detail_df.empty:
             _s1_color_col = '_장르'
             _s1_color_map = _GENRE_COLORS
 
+        _GENRE_ORDER = ['클래식', '뮤지컬', '어린이', '발레/연극', '대중', '기타']
+        _TYPE_ORDER = ['기획', '대관', '기타']
+        _s1_cat_orders = {_s1_color_col: _TYPE_ORDER if _s1_multi else _GENRE_ORDER}
+
         _s1_fig = px.scatter(
             _s1_grouped,
             x='_월위치',
@@ -170,6 +166,7 @@ if detail_df is not None and not detail_df.empty:
             color=_s1_color_col,
             custom_data=['공연명', '_장르', '_날짜포맷', '_유료합계', '_평균점유율'],
             color_discrete_map=_s1_color_map,
+            category_orders=_s1_cat_orders,
         )
         _s1_fig.update_traces(
             marker=dict(size=10, opacity=0.7, line=dict(width=1, color='#FFFFFF')),
