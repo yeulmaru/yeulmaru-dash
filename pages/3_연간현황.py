@@ -315,6 +315,13 @@ if detail_df is not None and not detail_df.empty:
             _active_cats = [c for c in _order if c in _s1_grouped[_s1_color_col].values]
 
             if _active_cats:
+                _n_cats = len(_active_cats)
+                _lbl_w = 25
+                _dat_w = (100 - _lbl_w) / _n_cats
+                _colgroup = f'<col style="width:{_lbl_w}%;">'
+                for _ in _active_cats:
+                    _colgroup += f'<col style="width:{_dat_w:.2f}%;">'
+
                 _hdr_cells = '<td style="padding:6px 12px;font-weight:700;color:#AAA;"></td>'
                 for _ac in _active_cats:
                     _hc = _s1_color_map.get(_ac, '#FFF')
@@ -327,7 +334,8 @@ if detail_df is not None and not detail_df.empty:
 
                 st.markdown(
                     f'<div style="padding:12px 0 32px 0;">'
-                    f'<table style="width:100%;border-collapse:collapse;font-size:14px;">'
+                    f'<table style="table-layout:fixed;width:100%;border-collapse:collapse;font-size:14px;">'
+                    f'<colgroup>{_colgroup}</colgroup>'
                     f'<tr style="background:rgba(255,255,255,0.015);border-bottom:1px solid #444;">{_hdr_cells}</tr>'
                     f'<tr>{_data_cells}</tr>'
                     f'</table>'
