@@ -460,15 +460,27 @@ for card_idx, (_, perf) in enumerate(active_df.iterrows()):
             unsafe_allow_html=True,
         )
         st.markdown('<div style="margin-top:20px;"></div>', unsafe_allow_html=True)
+
+        # ── 헤더 메타정보 (1번 구분선 위) ──
+        if total_rounds <= 1 and perf_rounds_info:
+            # 단일회차: 회차 / 공연일+시각 / 가용석 / 오픈석 / 목표
+            _ri0 = perf_rounds_info[0]
+            ic = st.columns([0.7, 1.8, 0.8, 0.8, 0.7], gap="small")
+            ic[0].markdown(f'<div style="font-size:21px;"><b>회차</b> &nbsp; {total_rounds}회</div>', unsafe_allow_html=True)
+            ic[1].markdown(f'<div style="font-size:21px;"><b>공연일</b> &nbsp; {_ri0["date"]} {_ri0["time"]}</div>', unsafe_allow_html=True)
+            ic[2].markdown(f'<div style="font-size:21px;"><b>가용석</b> &nbsp; {_ri0["seat"]:,}석</div>', unsafe_allow_html=True)
+            ic[3].markdown(f'<div style="font-size:21px;"><b>오픈석</b> &nbsp; {total_open:,}석</div>', unsafe_allow_html=True)
+            ic[4].markdown(f'<div style="font-size:21px;"><b>목표</b> &nbsp; {target_occ}%</div>', unsafe_allow_html=True)
+        else:
+            # 복수회차 (또는 회차정보 없음): 공연일(기간) / 회차 / 오픈석 / 목표
+            ic = st.columns(4, gap="small")
+            ic[0].markdown(f'<div style="font-size:21px;"><b>공연일</b> &nbsp; {date_range}</div>', unsafe_allow_html=True)
+            ic[1].markdown(f'<div style="font-size:21px;"><b>회차</b> &nbsp; {total_rounds}회</div>', unsafe_allow_html=True)
+            ic[2].markdown(f'<div style="font-size:21px;"><b>오픈석</b> &nbsp; {total_open:,}석</div>', unsafe_allow_html=True)
+            ic[3].markdown(f'<div style="font-size:21px;"><b>목표</b> &nbsp; {target_occ}%</div>', unsafe_allow_html=True)
+
         st.markdown("---")
-
-        ic = st.columns(4)
-        ic[0].markdown(f'<div style="font-size:21px;"><b>공연일</b> &nbsp; {date_range}</div>', unsafe_allow_html=True)
-        ic[1].markdown(f'<div style="font-size:21px;"><b>회차</b> &nbsp; {total_rounds}회</div>', unsafe_allow_html=True)
-        ic[2].markdown(f'<div style="font-size:21px;"><b>오픈석</b> &nbsp; {total_open:,}석</div>', unsafe_allow_html=True)
-        ic[3].markdown(f'<div style="font-size:21px;"><b>목표</b> &nbsp; {target_occ}%</div>', unsafe_allow_html=True)
-
-        st.markdown("")
+        st.markdown('<div style="margin-bottom:8px;"></div>', unsafe_allow_html=True)
 
         # ── 입력 영역 ──
         round_results = []
@@ -508,11 +520,6 @@ for card_idx, (_, perf) in enumerate(active_df.iterrows()):
                     unsafe_allow_html=True,
                 )
         else:
-            if perf_rounds_info:
-                ri = perf_rounds_info[0]
-                st.markdown(f"**시각** {ri['date']} {ri['time']} &nbsp;&nbsp; **가용석** {ri['seat']:,}석")
-            st.markdown("")
-
             _h = st.columns(3)
             _h[0].markdown("**유료좌석**")
             _h[1].markdown("**유료금액**")
