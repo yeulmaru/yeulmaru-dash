@@ -567,55 +567,55 @@ for card_idx, (_, perf) in enumerate(active_df.iterrows()):
 
         st.markdown('<div style="margin-top:20px;"></div>', unsafe_allow_html=True)
         st.markdown("---")
-        st.markdown('<div style="padding:0 80px 20px 80px;">', unsafe_allow_html=True)
+        _COL_RATIO = [0.4, 1, 1.2, 1.2, 0.8, 1, 0.4]
 
         # 헤더
-        _hc = st.columns([1.2, 1.5, 1.5, 1, 1.2])
-        _hc[0].markdown("")
-        _hc[1].markdown(f'<div style="{_HDR}">누적</div>', unsafe_allow_html=True)
-        _hc[2].markdown(f'<div style="{_HDR}">판매금액</div>', unsafe_allow_html=True)
-        _hc[3].markdown(f'<div style="{_HDR}">점유율</div>', unsafe_allow_html=True)
-        _hc[4].markdown(f'<div style="{_HDR}">목표대비</div>', unsafe_allow_html=True)
+        _hc = st.columns(_COL_RATIO)
+        _hc[1].markdown("")
+        _hc[2].markdown(f'<div style="{_HDR}">누적</div>', unsafe_allow_html=True)
+        _hc[3].markdown(f'<div style="{_HDR}">판매금액</div>', unsafe_allow_html=True)
+        _hc[4].markdown(f'<div style="{_HDR}">점유율</div>', unsafe_allow_html=True)
+        _hc[5].markdown(f'<div style="{_HDR}">목표대비</div>', unsafe_allow_html=True)
 
         # 직전 행
-        _r1 = st.columns([1.2, 1.5, 1.5, 1, 1.2])
-        _r1[0].markdown(f'<div style="{_LBL}color:#888;">{_p_label}</div>', unsafe_allow_html=True)
+        _r1 = st.columns(_COL_RATIO)
+        _r1[1].markdown(f'<div style="{_LBL}color:#888;">{_p_label}</div>', unsafe_allow_html=True)
         if _p:
             _pv_sign = "+" if _p_vs_tgt >= 0 else ""
-            _r1[1].markdown(f'<div style="{_V_PREV}">{_p_seats:,}석</div>', unsafe_allow_html=True)
-            _r1[2].markdown(f'<div style="{_V_PREV}">{_p_amount/10000:,.1f}만원</div>', unsafe_allow_html=True)
-            _r1[3].markdown(f'<div style="{_V_PREV}">{_p_occ:.1f}%</div>', unsafe_allow_html=True)
-            _r1[4].markdown(f'<div style="{_V_PREV}">{_pv_sign}{_p_vs_tgt:.1f}%p</div>', unsafe_allow_html=True)
+            _r1[2].markdown(f'<div style="{_V_PREV}">{_p_seats:,}석</div>', unsafe_allow_html=True)
+            _r1[3].markdown(f'<div style="{_V_PREV}">{_p_amount/10000:,.1f}만원</div>', unsafe_allow_html=True)
+            _r1[4].markdown(f'<div style="{_V_PREV}">{_p_occ:.1f}%</div>', unsafe_allow_html=True)
+            _r1[5].markdown(f'<div style="{_V_PREV}">{_pv_sign}{_p_vs_tgt:.1f}%p</div>', unsafe_allow_html=True)
         else:
-            for _cc in _r1[1:]:
+            for _cc in _r1[2:6]:
                 _cc.markdown(f'<div style="{_V_PREV}">—</div>', unsafe_allow_html=True)
 
         # 현재 행 (DB 마지막 저장값, 입력 반영 안 함)
-        _r2 = st.columns([1.2, 1.5, 1.5, 1, 1.2])
-        _r2[0].markdown(f'<div style="{_LBL}color:#FFF;">현재</div>', unsafe_allow_html=True)
-        _r2[1].markdown(f'<div style="{_V_CUR}">{cur_seats:,}석</div>', unsafe_allow_html=True)
-        _r2[2].markdown(f'<div style="{_V_CUR}">{cur_amount/10000:,.1f}만원</div>', unsafe_allow_html=True)
-        _r2[3].markdown(f'<div style="{_V_CUR}">{cur_occ:.1f}%</div>', unsafe_allow_html=True)
+        _r2 = st.columns(_COL_RATIO)
+        _r2[1].markdown(f'<div style="{_LBL}color:#FFF;">현재</div>', unsafe_allow_html=True)
+        _r2[2].markdown(f'<div style="{_V_CUR}">{cur_seats:,}석</div>', unsafe_allow_html=True)
+        _r2[3].markdown(f'<div style="{_V_CUR}">{cur_amount/10000:,.1f}만원</div>', unsafe_allow_html=True)
+        _r2[4].markdown(f'<div style="{_V_CUR}">{cur_occ:.1f}%</div>', unsafe_allow_html=True)
         _cv_sign = "+" if cur_vs_tgt >= 0 else ""
         _cv_color = ACCENT if cur_vs_tgt >= 0 else "#FF4B4B"
-        _r2[4].markdown(f'<div style="{_V_CHG}color:{_cv_color};">{_cv_sign}{cur_vs_tgt:.1f}%p</div>', unsafe_allow_html=True)
+        _r2[5].markdown(f'<div style="{_V_CHG}color:{_cv_color};">{_cv_sign}{cur_vs_tgt:.1f}%p</div>', unsafe_allow_html=True)
 
         # 변경 행 (입력 있을 때만)
         if has_input_data:
-            _r3 = st.columns([1.2, 1.5, 1.5, 1, 1.2])
-            _r3[0].markdown(f'<div style="{_LBL}color:#FFD700;">(변경)</div>', unsafe_allow_html=True)
+            _r3 = st.columns(_COL_RATIO)
+            _r3[1].markdown(f'<div style="{_LBL}color:#FFD700;">(변경)</div>', unsafe_allow_html=True)
 
             def _chg_html(val, fmt_str):
                 _c = ACCENT if val >= 0 else "#FF4B4B"
                 _s = "▲ +" if val > 0 else ("▼ " if val < 0 else "")
                 return f'<div style="{_V_CHG}color:{_c};">{_s}{fmt_str}</div>'
 
-            _r3[1].markdown(_chg_html(in_seats, f"{in_seats:,}석"), unsafe_allow_html=True)
-            _r3[2].markdown(_chg_html(in_amount, f"{in_amount/10000:,.1f}만원"), unsafe_allow_html=True)
-            _r3[3].markdown(_chg_html(in_occ, f"{in_occ:.1f}%p"), unsafe_allow_html=True)
+            _r3[2].markdown(_chg_html(in_seats, f"{in_seats:,}석"), unsafe_allow_html=True)
+            _r3[3].markdown(_chg_html(in_amount, f"{in_amount/10000:,.1f}만원"), unsafe_allow_html=True)
             _r3[4].markdown(_chg_html(in_occ, f"{in_occ:.1f}%p"), unsafe_allow_html=True)
+            _r3[5].markdown(_chg_html(in_occ, f"{in_occ:.1f}%p"), unsafe_allow_html=True)
 
-        st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown('<div style="margin-bottom:20px;"></div>', unsafe_allow_html=True)
 
         # ── 카드별 저장 버튼 ──
         # 호환성 alias (혹시 다른 코드에서 쓸 경우)
