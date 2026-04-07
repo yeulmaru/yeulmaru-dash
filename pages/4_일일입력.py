@@ -84,6 +84,12 @@ div.stButton > button[kind="primary"]:focus:not(:active) {
     flex-direction: column;
     justify-content: center;
 }
+/* 헤더 행 음영 배경 (marker div 바로 뒤 st.columns) */
+.header-row-bg + div[data-testid="stHorizontalBlock"] {
+    background: rgba(255,255,255,0.05) !important;
+    border-radius: 4px;
+    padding: 2px 0;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -511,7 +517,7 @@ for card_idx, (_, perf) in enumerate(active_df.iterrows()):
         _diff_p_color = '#FFFFFF' if _hdr_diff_pct >= 0 else _DIM
         _tbl = (
             f'<table style="font-size:17px;border-collapse:collapse;width:100%;">'
-            f'<tr style="border-bottom:1px solid #333;">'
+            f'<tr style="border-bottom:1px solid #333;background:rgba(255,255,255,0.05);">'
             f'<td style="{_TD}"></td>'
             f'<td style="{_TDH}">현재</td>'
             f'<td style="{_TDH}">목표</td>'
@@ -543,6 +549,7 @@ for card_idx, (_, perf) in enumerate(active_df.iterrows()):
         round_results = []
 
         if total_rounds > 1 and perf_rounds_info:
+            st.markdown('<div class="header-row-bg"></div>', unsafe_allow_html=True)
             _h = st.columns([0.4, 0.9, 0.6, 0.8, 0.8, 0.8])
             _h[0].markdown(f'<div style="font-size:21px;font-weight:700;text-align:center;color:{LBL_BLUE};">#</div>', unsafe_allow_html=True)
             _h[1].markdown(f'<div style="font-size:21px;font-weight:700;text-align:center;color:{LBL_BLUE};">공연일/시각</div>', unsafe_allow_html=True)
@@ -559,7 +566,7 @@ for card_idx, (_, perf) in enumerate(active_df.iterrows()):
                 with cols[1]:
                     st.markdown(f'<div style="font-size:21px;text-align:center;">{rd_info["date"]} {rd_info["time"]}</div>', unsafe_allow_html=True)
                 with cols[2]:
-                    _rd_sold = round(cur_seats / total_rounds) if total_rounds > 0 else 0
+                    _rd_sold = round(_hdr_seats / total_rounds) if total_rounds > 0 else 0
                     st.markdown(f'<div style="font-size:21px;text-align:center;color:{ACCENT};font-weight:700;">{_rd_sold:,}</div>', unsafe_allow_html=True)
 
                 result = _render_input_row(
@@ -623,6 +630,7 @@ for card_idx, (_, perf) in enumerate(active_df.iterrows()):
         _COL_RATIO = [0.4, 1, 1.2, 1.2, 0.8, 1, 0.4]
 
         # 헤더
+        st.markdown('<div class="header-row-bg"></div>', unsafe_allow_html=True)
         _hc = st.columns(_COL_RATIO)
         _hc[1].markdown("")
         _hc[2].markdown(f'<div style="{_HDR}">누적</div>', unsafe_allow_html=True)
