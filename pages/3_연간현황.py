@@ -90,6 +90,23 @@ if detail_df is not None and not detail_df.empty:
             is_disabled = _s1_only_one and is_checked
             _s1_cb_cols[i].checkbox(t, value=is_checked, key=f'_s1_cb_{t}', disabled=is_disabled)
 
+        # 체크박스 분류별 색상 CSS
+        _CB_COLORS = {'기획': '#0FFD02', '대관': '#FFFF00', '기타': '#FF6EC7'}
+        _cb_css_parts = []
+        for _t in _s1_types:
+            _cc = _CB_COLORS.get(_t, '#FFFFFF')
+            _k = f'_s1_cb_{_t}'
+            _cb_css_parts.append(f'''
+            div[data-testid="stCheckbox"][data-key="{_k}"] label span[data-testid="stCheckboxLabel"] {{
+                color: {_cc} !important;
+            }}
+            div[data-testid="stCheckbox"][data-key="{_k}"] label span[role="checkbox"][aria-checked="true"] {{
+                background-color: {_cc} !important;
+                border-color: {_cc} !important;
+            }}
+            ''')
+        st.markdown(f'<style>{"".join(_cb_css_parts)}</style>', unsafe_allow_html=True)
+
         # 필터 적용
         _s1_sel_final = [t for t in _s1_types if st.session_state.get(f'_s1_cb_{t}', False)]
         if _s1_sel_final:
@@ -219,10 +236,10 @@ if detail_df is not None and not detail_df.empty:
                 return '-'
             _wd = ['월','화','수','목','금','토','일']
             if s == e or row['_회차수'] == 1:
-                return f"{e.month}.{e.day}({_wd[e.weekday()]})"
+                return f"{e.month:02d}.{e.day:02d}({_wd[e.weekday()]})"
             if s.month == e.month:
-                return f"{s.month}.{s.day}({_wd[s.weekday()]})~{e.day}({_wd[e.weekday()]})"
-            return f"{s.month}.{s.day}({_wd[s.weekday()]})~{e.month}.{e.day}({_wd[e.weekday()]})"
+                return f"{s.month:02d}.{s.day:02d}({_wd[s.weekday()]})~{e.day:02d}({_wd[e.weekday()]})"
+            return f"{s.month:02d}.{s.day:02d}({_wd[s.weekday()]})~{e.month:02d}.{e.day:02d}({_wd[e.weekday()]})"
 
         _s1_display = pd.DataFrame({
             '공연일': _s1_tbl.apply(_fmt_date_range, axis=1),
