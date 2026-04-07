@@ -81,8 +81,12 @@ div.stButton > button[kind="primary"]:focus:not(:active) {
 
 # (저장 결과는 각 카드 내부에서 표시됨 - 아래 카드 렌더링 참조)
 
-# 미저장 경고 배너
-if st.session_state.has_unsaved_changes:
+# 미저장 경고 배너 (입력 위젯 값 실시간 스캔)
+_any_nonzero = any(
+    v != 0 for k, v in st.session_state.items()
+    if k.startswith('input_') and isinstance(v, (int, float))
+)
+if _any_nonzero:
     st.warning("⚠️ 저장되지 않은 변경사항이 있습니다.")
 
 st.markdown("---")
@@ -324,9 +328,6 @@ def _render_input_row(perf_id, round_no, seat_capacity, cols_spec, prefill=None)
     total_amount = paid_a
     occ = min(total_seats / seat_capacity * 100, 100.0) if seat_capacity > 0 else 0.0
     has_input = any(v != 0 for v in (paid_s, paid_a, free_s))
-
-    if has_input:
-        st.session_state.has_unsaved_changes = True
 
     return {
         '유료좌석': paid_s, '유료금액': paid_a,
