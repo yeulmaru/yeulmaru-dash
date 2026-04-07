@@ -455,15 +455,16 @@ for card_idx, (_, perf) in enumerate(active_df.iterrows()):
     with st.container(border=True):
         st.markdown(
             f'{_dday_badge(start_dt, today)} &nbsp; '
-            f'<span style="font-size:20px;font-weight:700;color:{ACCENT};">{perf_name}</span>',
+            f'<span style="font-size:20px;font-weight:700;color:{ACCENT};">{perf_name}</span>'
+            f'<div style="margin-bottom:16px;"></div>',
             unsafe_allow_html=True,
         )
 
         ic = st.columns(4)
-        ic[0].markdown(f"**공연일** &nbsp; {date_range}")
-        ic[1].markdown(f"**회차** &nbsp; {total_rounds}회")
-        ic[2].markdown(f"**오픈석** &nbsp; {total_open:,}석")
-        ic[3].markdown(f"**목표** &nbsp; {target_occ}%")
+        ic[0].markdown(f'<div style="font-size:21px;"><b>공연일</b> &nbsp; {date_range}</div>', unsafe_allow_html=True)
+        ic[1].markdown(f'<div style="font-size:21px;"><b>회차</b> &nbsp; {total_rounds}회</div>', unsafe_allow_html=True)
+        ic[2].markdown(f'<div style="font-size:21px;"><b>오픈석</b> &nbsp; {total_open:,}석</div>', unsafe_allow_html=True)
+        ic[3].markdown(f'<div style="font-size:21px;"><b>목표</b> &nbsp; {target_occ}%</div>', unsafe_allow_html=True)
 
         st.markdown("")
 
