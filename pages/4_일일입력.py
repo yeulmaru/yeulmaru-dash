@@ -181,6 +181,38 @@ def _load_latest_for_perf(trend_df, perf_name, base_date_ts):
     }
 
 
+def _load_prev_for_perf(trend_df, perf_name, base_date_ts):
+    """해당 공연의 직전 저장값 반환 (현재 바로 이전, 같은 날 포함)"""
+    if trend_df is None or trend_df.empty:
+        return None
+    tdf = trend_df.copy()
+    tdf['기준일자'] = pd.to_datetime(tdf['기준일자'], errors='coerce')
+    tdf = tdf.dropna(subset=['기준일자'])
+    tdf = tdf[tdf['기준일자'] <= base_date_ts]
+    perf_s = str(perf_name).strip()
+    mask = tdf['공연명'].astype(str).apply(
+        lambda x: x.strip() == perf_s or perf_s in x.strip() or x.strip() in perf_s
+    )
+    perf_df = tdf[mask]
+    if len(perf_df) < 2:
+        return None
+    prev_row = perf_df.sort_values('기준일자').iloc[-2]
+    def _i(col):
+        v = prev_row.get(col)
+        try:
+            return int(v) if pd.notna(v) else 0
+        except (ValueError, TypeError):
+            return 0
+    return {
+        '유료좌석': _i('유료좌석'),
+        '유료금액': _i('유료금액'),
+        '무료좌석': _i('무료좌석'),
+        '합계좌석': _i('합계좌석'),
+        '합계금액': _i('합계금액'),
+        '기준일자': prev_row['기준일자'],
+    }
+
+
 prev_data, prev_date = _load_prev_day_data(trend_df, today)
 today_data = _load_today_data(trend_df, today)
 
@@ -396,6 +428,8 @@ for card_idx, (_, perf) in enumerate(active_df.iterrows()):
     today_pf = _match_today(perf_name, today_data)
     # 해당 공연의 최근 저장값 (오늘 포함, 없으면 None)
     latest_saved = _load_latest_for_perf(trend_df, perf_name, today)
+    # 직전 저장값 (현재 바로 이전)
+    prev_entry = _load_prev_for_perf(trend_df, perf_name, today)
 
     # ── 카드 ──
     with st.container(border=True):
@@ -493,34 +527,36 @@ for card_idx, (_, perf) in enumerate(active_df.iterrows()):
         in_seats = sum(r['합계좌석'] for r in round_results)
         in_amount = sum(r['합계금액'] for r in round_results)
 
-        # ── 비교 표 (이전 갱신 / 현재 / 변경) ──
-        # 이전 갱신 값 (전일 데이터)
-        _p = prev  # _match_prev 결과 (전일)
+        # ── 비교 표 (직전 / 현재 / 변경) ──
+        # 직전 저장값 (현재 바로 이전 row)
+        _p = prev_entry
         _p_seats = int(_p.get('합계좌석', 0)) if _p else None
         _p_amount = int(_p.get('합계금액', 0)) if _p else None
         _p_occ = (_p_seats / total_open * 100) if _p and total_open > 0 else None
         _p_vs_tgt = (_p_occ - target_occ) if _p_occ is not None else None
-        _p_label = _fmt_date_wd(prev_date) if prev_date and _p else "최초입력"
+        _p_label = _fmt_date_wd(_p.get('기준일자')) if _p else "최초입력"
 
         # 입력값 점유율
         in_occ = (in_seats / total_open * 100) if total_open > 0 else 0.0
 
-        _S = 'font-size:13px;color:#888;'
-        _V_PREV = 'font-size:18px;color:#888;'
-        _V_CUR = f'font-size:22px;font-weight:700;color:{ACCENT};'
-        _LBL = 'font-size:13px;font-weight:600;'
+        _CELL = 'padding:4px 0;'
+        _HDR = f'{_CELL}font-size:14px;font-weight:700;color:#FFFFFF;'
+        _V_PREV = f'{_CELL}font-size:14px;color:#AAA;'
+        _V_CUR = f'{_CELL}font-size:14px;font-weight:700;color:{ACCENT};'
+        _V_CHG = f'{_CELL}font-size:14px;font-weight:700;'
+        _LBL = f'{_CELL}font-size:14px;font-weight:600;'
 
         st.markdown("---")
 
         # 헤더
         _hc = st.columns([1.2, 1.5, 1.5, 1, 1.2])
         _hc[0].markdown("")
-        _hc[1].markdown(f'<div style="{_S}">누적</div>', unsafe_allow_html=True)
-        _hc[2].markdown(f'<div style="{_S}">판매금액</div>', unsafe_allow_html=True)
-        _hc[3].markdown(f'<div style="{_S}">점유율</div>', unsafe_allow_html=True)
-        _hc[4].markdown(f'<div style="{_S}">목표대비</div>', unsafe_allow_html=True)
+        _hc[1].markdown(f'<div style="{_HDR}">누적</div>', unsafe_allow_html=True)
+        _hc[2].markdown(f'<div style="{_HDR}">판매금액</div>', unsafe_allow_html=True)
+        _hc[3].markdown(f'<div style="{_HDR}">점유율</div>', unsafe_allow_html=True)
+        _hc[4].markdown(f'<div style="{_HDR}">목표대비</div>', unsafe_allow_html=True)
 
-        # 이전 갱신 행
+        # 직전 행
         _r1 = st.columns([1.2, 1.5, 1.5, 1, 1.2])
         _r1[0].markdown(f'<div style="{_LBL}color:#888;">{_p_label}</div>', unsafe_allow_html=True)
         if _p:
@@ -541,7 +577,7 @@ for card_idx, (_, perf) in enumerate(active_df.iterrows()):
         _r2[3].markdown(f'<div style="{_V_CUR}">{cur_occ:.1f}%</div>', unsafe_allow_html=True)
         _cv_sign = "+" if cur_vs_tgt >= 0 else ""
         _cv_color = ACCENT if cur_vs_tgt >= 0 else "#FF4B4B"
-        _r2[4].markdown(f'<div style="font-size:22px;font-weight:700;color:{_cv_color};">{_cv_sign}{cur_vs_tgt:.1f}%p</div>', unsafe_allow_html=True)
+        _r2[4].markdown(f'<div style="{_V_CHG}color:{_cv_color};">{_cv_sign}{cur_vs_tgt:.1f}%p</div>', unsafe_allow_html=True)
 
         # 변경 행 (입력 있을 때만)
         if has_input_data:
@@ -551,7 +587,7 @@ for card_idx, (_, perf) in enumerate(active_df.iterrows()):
             def _chg_html(val, fmt_str):
                 _c = ACCENT if val >= 0 else "#FF4B4B"
                 _s = "▲ +" if val > 0 else ("▼ " if val < 0 else "")
-                return f'<div style="font-size:18px;font-weight:700;color:{_c};">{_s}{fmt_str}</div>'
+                return f'<div style="{_V_CHG}color:{_c};">{_s}{fmt_str}</div>'
 
             _r3[1].markdown(_chg_html(in_seats, f"{in_seats:,}석"), unsafe_allow_html=True)
             _r3[2].markdown(_chg_html(in_amount, f"{in_amount/10000:,.1f}만원"), unsafe_allow_html=True)
