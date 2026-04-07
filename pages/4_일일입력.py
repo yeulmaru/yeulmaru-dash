@@ -266,7 +266,7 @@ def _render_input_row(perf_id, round_no, seat_capacity, cols_spec, prefill=None)
     total_seats = paid_s + free_s
     total_amount = paid_a
     occ = min(total_seats / seat_capacity * 100, 100.0) if seat_capacity > 0 else 0.0
-    has_input = (paid_s + paid_a + free_s) > 0
+    has_input = any(v != 0 for v in (paid_s, paid_a, free_s))
 
     if has_input:
         st.session_state.has_unsaved_changes = True
