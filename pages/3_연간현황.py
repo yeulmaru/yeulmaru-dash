@@ -295,7 +295,7 @@ if detail_df is not None and not detail_df.empty:
                 st.markdown(
                     f'<div style="padding:12px 0 32px 0;">'
                     f'<table style="width:100%;border-collapse:collapse;font-size:14px;">'
-                    f'<tr style="background:rgba(255,255,255,0.05);border-bottom:1px solid #444;">{_hdr_cells}</tr>'
+                    f'<tr style="background:rgba(255,255,255,0.015);border-bottom:1px solid #444;">{_hdr_cells}</tr>'
                     f'<tr>{_data_cells}</tr>'
                     f'</table>'
                     f'</div>',
@@ -329,7 +329,7 @@ if detail_df is not None and not detail_df.empty:
 
         def _zebra(row):
             if row.name % 2 == 1:
-                return ['background-color: rgba(255,255,255,0.05)'] * len(row)
+                return ['background-color: rgba(255,255,255,0.015)'] * len(row)
             return [''] * len(row)
 
         _s1_styled = _s1_display.style.set_properties(
