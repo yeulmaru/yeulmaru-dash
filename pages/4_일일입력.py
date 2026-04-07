@@ -252,16 +252,22 @@ def _render_input_row(perf_id, round_no, seat_capacity, cols_spec, prefill=None)
     def_paid_a = pf.get('유료금액', 0)
     def_free = pf.get('무료좌석', 0)
 
+    # widget key counter (저장 성공 시 증가 → 위젯 재생성으로 초기화)
+    _ckey = f"counter_{perf_id}_{round_no}"
+    if _ckey not in st.session_state:
+        st.session_state[_ckey] = 0
+    _v = st.session_state[_ckey]
+
     c1, c2, c3 = cols_spec
     with c1:
         paid_s = st.number_input("유료좌석", value=def_paid_s,
-                                  step=1, key=f"{sk}_ps", label_visibility="collapsed")
+                                  step=1, key=f"{sk}_ps_v{_v}", label_visibility="collapsed")
     with c2:
         paid_a = st.number_input("유료금액", value=def_paid_a,
-                                  step=1000, key=f"{sk}_pa", label_visibility="collapsed")
+                                  step=1000, key=f"{sk}_pa_v{_v}", label_visibility="collapsed")
     with c3:
         free_s = st.number_input("무료좌석", value=def_free,
-                                  step=1, key=f"{sk}_fr", label_visibility="collapsed")
+                                  step=1, key=f"{sk}_fr_v{_v}", label_visibility="collapsed")
 
     total_seats = paid_s + free_s
     total_amount = paid_a
@@ -583,11 +589,11 @@ for card_idx, (_, perf) in enumerate(active_df.iterrows()):
                     st.session_state.save_results.append(sr)
 
                 if all(sr['status'] != 'error' for sr in save_res):
-                    # 이 카드의 입력 필드 session_state 0으로 리셋
-                    _prefix = f"input_{perf_id}_"
-                    for _k in list(st.session_state.keys()):
-                        if _k.startswith(_prefix):
-                            st.session_state[_k] = 0
+                    # 이 카드의 입력 필드 초기화 (counter 증가 → 위젯 재생성)
+                    for _rn in range(1, total_rounds + 1):
+                        _ckey = f"counter_{perf_id}_{_rn}"
+                        if _ckey in st.session_state:
+                            st.session_state[_ckey] += 1
                     st.session_state.has_unsaved_changes = False
                     st.cache_data.clear()
                     st.rerun()
@@ -664,13 +670,14 @@ if has_any:
 
             st.session_state.save_results = all_results
             if all(r['status'] != 'error' for r in all_results):
-                # 성공한 카드들의 입력 필드 0으로 리셋
+                # 성공한 카드들의 입력 필드 초기화 (counter 증가 → 위젯 재생성)
                 for _c in input_cards:
                     _pid = _c['perf']['ID']
-                    _prefix = f"input_{_pid}_"
-                    for _k in list(st.session_state.keys()):
-                        if _k.startswith(_prefix):
-                            st.session_state[_k] = 0
+                    _tr = int(_c['perf']['총회차']) if pd.notna(_c['perf']['총회차']) else 1
+                    for _rn in range(1, _tr + 1):
+                        _ckey = f"counter_{_pid}_{_rn}"
+                        if _ckey in st.session_state:
+                            st.session_state[_ckey] += 1
                 st.session_state.has_unsaved_changes = False
                 st.cache_data.clear()
             else:
