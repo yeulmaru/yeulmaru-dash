@@ -73,10 +73,9 @@ if detail_df is not None and not detail_df.empty:
     if _s1_perf_type_col:
         _s1_types = sorted(_s1_year_df[_s1_perf_type_col].dropna().astype(str).str.strip().unique())
 
-        # session_state 초기화
-        if '_s1_cb_init' not in st.session_state:
-            st.session_state['_s1_cb_init'] = True
-            for t in _s1_types:
+        # session_state 초기화 (키가 없을 때만 default 설정)
+        for t in _s1_types:
+            if f'_s1_cb_{t}' not in st.session_state:
                 st.session_state[f'_s1_cb_{t}'] = (t == '기획')
 
         # 현재 선택 상태 읽기
@@ -90,7 +89,7 @@ if detail_df is not None and not detail_df.empty:
             is_checked = st.session_state.get(f'_s1_cb_{t}', False)
             is_disabled = _s1_only_one and is_checked
             with _s1_cb_cols[i]:
-                st.checkbox(t, value=is_checked, key=f'_s1_cb_{t}', disabled=is_disabled)
+                st.checkbox(t, key=f'_s1_cb_{t}', disabled=is_disabled)
                 _bar_color = _CB_COLORS.get(t, '#555') if is_checked else '#333'
                 st.markdown(
                     f'<div style="height:3px;background:{_bar_color};border-radius:2px;'
