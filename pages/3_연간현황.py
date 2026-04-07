@@ -11,7 +11,9 @@ st.set_page_config(page_title="연간 운영실적", page_icon="📊", layout="w
 from utils.auth import check_password
 check_password()
 
-st.title("📊 연간 운영실적 (2012~)")
+st.title("📊 연간 운영 현황")
+st.caption("2012년부터의 공연 운영 데이터를 다양한 관점으로 분석합니다.")
+st.divider()
 
 yearly_df = load_yearly_performance()
 detail_df = load_detailed_management()
@@ -19,6 +21,104 @@ detail_df = load_detailed_management()
 if yearly_df is None or detail_df is None:
     st.error("데이터를 정상적으로 불러오지 못했습니다")
     st.stop()
+
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# [1] 연도별 공연 판매 현황
+# ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+st.markdown('<div style="font-size:2rem;font-weight:700;margin:24px 0 16px 0;">[1] 연도별 공연 판매 현황</div>', unsafe_allow_html=True)
+
+if detail_df is not None and not detail_df.empty:
+    _s1_df = detail_df.copy()
+
+    # 제외 조건
+    _s1_df = _s1_df[_s1_df['상태'] != '취소공연']
+    _s1_df = _s1_df[~_s1_df['사업\n구분'].isin(['교육', '특강', '기타', '연기'])]
+    _s1_df = _s1_df[_s1_df['티켓\n구분'] != '무료']
+    _s1_df = _s1_df.dropna(subset=['기본\n좌석', '발권\n유료', '년도'])
+
+    # 기본좌석 숫자 변환 + 0 제외
+    _s1_df['기본\n좌석'] = pd.to_numeric(_s1_df['기본\n좌석'], errors='coerce')
+    _s1_df = _s1_df[_s1_df['기본\n좌석'] > 0]
+
+    # 점유율 계산
+    _s1_df['_점유율'] = _s1_df['발권\n유료'] / _s1_df['기본\n좌석'] * 100
+
+    # 연도 int 변환
+    _s1_df['_년도'] = _s1_df['년도'].astype(int)
+
+    # 월/일 컬럼 suffix 제거 ('1월'→'1', '26일'→'26')
+    _s1_df['월'] = _s1_df['월'].astype(str).str.replace('월', '', regex=False).str.strip()
+    _s1_df['일'] = _s1_df['일'].astype(str).str.replace('일', '', regex=False).str.strip()
+
+    # 날짜 조합
+    _s1_df['_날짜'] = pd.to_datetime(
+        _s1_df['년도'].astype(int).astype(str) + '-' +
+        _s1_df['월'].astype(str) + '-' +
+        _s1_df['일'].astype(str),
+        errors='coerce'
+    )
+    _s1_df = _s1_df.dropna(subset=['_날짜'])
+
+    # 호버용 날짜 포맷
+    _weekday_kr = ['월', '화', '수', '목', '금', '토', '일']
+    _s1_df['_날짜포맷'] = _s1_df['_날짜'].apply(
+        lambda d: f"'{d.year % 100:02d}.{d.month:02d}.{d.day:02d}({_weekday_kr[d.weekday()]})"
+        if pd.notna(d) else ''
+    )
+
+    # X축 월 위치
+    _s1_df['_월위치'] = _s1_df['_날짜'].dt.month + (_s1_df['_날짜'].dt.day - 1) / 31
+
+    # 연도 선택
+    _s1_available_years = sorted(_s1_df['_년도'].unique(), reverse=True)
+    _s1_selected_year = st.selectbox("연도 선택", _s1_available_years, index=0, key="_s1_year")
+    _s1_year_df = _s1_df[_s1_df['_년도'] == _s1_selected_year]
+
+    if _s1_year_df.empty:
+        st.info("해당 연도 데이터가 없습니다.")
+    else:
+        _s1_fig = px.scatter(
+            _s1_year_df,
+            x='_월위치',
+            y='_점유율',
+            custom_data=['공연명', '장르1', '_날짜포맷', '발권\n유료', '_점유율'],
+            color_discrete_sequence=['#0FFD02'],
+        )
+        _s1_fig.update_traces(
+            marker=dict(size=10, opacity=0.7, line=dict(width=1, color='#FFFFFF')),
+            hovertemplate=(
+                '<b>%{customdata[0]}</b><br>'
+                '장르: %{customdata[1]}<br>'
+                '공연일: %{customdata[2]}<br>'
+                '유료판매: %{customdata[3]:,.0f}석<br>'
+                '점유율: %{customdata[4]:.1f}%<extra></extra>'
+            ),
+        )
+        _s1_fig.update_layout(
+            xaxis=dict(
+                title='월',
+                tickmode='array',
+                tickvals=list(range(1, 13)),
+                ticktext=[f'{m}월' for m in range(1, 13)],
+                range=[0.5, 12.5],
+            ),
+            yaxis=dict(
+                title='유료점유율(%)',
+                range=[0, 110],
+            ),
+            height=500,
+            showlegend=False,
+        )
+        _s1_fig = apply_common_layout(_s1_fig)
+        st.plotly_chart(_s1_fig, use_container_width=True)
+
+        # 요약 지표
+        _s1_c1, _s1_c2, _s1_c3 = st.columns(3)
+        _s1_c1.metric("총 공연 수", f"{len(_s1_year_df)}건")
+        _s1_c2.metric("평균 점유율", f"{_s1_year_df['_점유율'].mean():.1f}%")
+        _s1_c3.metric("최고 점유율", f"{_s1_year_df['_점유율'].max():.1f}%")
+
+    st.divider()
 
 st.subheader("📈 연간 공연 실적 추이")
 
