@@ -328,9 +328,11 @@ def _dday_color(days):
     if pd.isna(days):
         return "#FFFFFF"
     d = int(days)
-    if 0 <= d < 14:
+    if d < 0:
+        return "#888888"
+    if d <= 7:
         return "#FF8C00"
-    elif 14 <= d < 28:
+    if d <= 28:
         return "#FFD700"
     return "#FFFFFF"
 
@@ -400,8 +402,8 @@ def build_html_table(df, is_active=True):
             if '공연일(날짜)' in r.index and pd.notna(r['공연일(날짜)']):
                 dt_str = pd.to_datetime(r['공연일(날짜)']).strftime('%Y-%m-%d')
             html += f'<td style="padding:8px 12px;">{dt_str}</td>'
-        # 판매좌석 (흰색)
-        html += f'<td style="padding:8px 12px;text-align:right;color:#FFFFFF;font-weight:600;">{seats:,}</td>'
+        # 판매좌석 (노랑)
+        html += f'<td style="padding:8px 12px;text-align:right;color:#FFD700;font-weight:600;">{seats:,}</td>'
         # 전일대비
         html += f'<td style="padding:8px 12px;text-align:right;color:{ACCENT};font-weight:600;">{diff_str}</td>'
         # 오픈석(누적)
@@ -719,6 +721,31 @@ st.markdown('<hr style="margin:8px 0;border-color:rgba(255,255,255,0.1);">', uns
 if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in trend_df.columns:
     st.markdown('<div style="font-size:2rem;font-weight:700;margin:0 0 24px 0;">[3] 판매추이</div>', unsafe_allow_html=True)
 
+    # ── 반응형 CSS (판매추이 차트) ──
+    st.markdown('''<style>
+    div[data-testid="stPlotlyChart"] {
+        aspect-ratio: 16/9;
+        min-height: 350px;
+        max-height: 850px;
+    }
+    div[data-testid="stPlotlyChart"] > div,
+    div[data-testid="stPlotlyChart"] iframe {
+        height: 100% !important;
+        width: 100% !important;
+    }
+
+    @media (max-width: 768px) {
+        div[data-testid="stHorizontalBlock"] {
+            flex-direction: column !important;
+        }
+        div[data-testid="stHorizontalBlock"] > div[data-testid="stColumn"] {
+            width: 100% !important;
+            flex: 1 1 100% !important;
+            min-width: 100% !important;
+        }
+    }
+    </style>''', unsafe_allow_html=True)
+
     # ── 판매중 공연 목록 결정 ──
     # 1차: 공연마스터에 '상태' 컬럼이 있으면 '판매중'인 공연
     # 2차: 판매현황 테이블의 active_df (공연일 >= 오늘) 상위 6개
@@ -790,6 +817,15 @@ if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in 
     _commercial = [p for p in _default_perfs if _get_category(p) == '상업성']
     _public = [p for p in _default_perfs if _get_category(p) == '공공성']
 
+    # ── 통합 공연 리스트 (공연일 오름차순) ──
+    _all_perfs = _commercial + _public
+    _perf_date_lookup = {}
+    if not active_df.empty and '공연일(날짜)' in active_df.columns:
+        for _, _r in active_df.iterrows():
+            _perf_date_lookup[_r['공연명']] = _r['공연일(날짜)']
+    _far_future = pd.Timestamp('2099-12-31')
+    _all_perfs.sort(key=lambda p: _perf_date_lookup.get(p, _far_future))
+
     _LABEL_STYLE = 'font-size:24px;font-weight:bold;color:#0FFD02;margin:0 0 12px 0;'
 
     # ── 공연별 색상 팔레트 ──
@@ -798,9 +834,8 @@ if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in 
     def _build_color_map(perf_names):
         return {name: _VIVID_COLORS[i % len(_VIVID_COLORS)] for i, name in enumerate(perf_names)}
 
-    # ── 색상 맵 미리 생성 (체크리스트 + 차트 공유) ──
-    _color_map_commercial = _build_color_map(_commercial)
-    _color_map_public = _build_color_map(_public)
+    # ── 통합 색상 맵 (체크리스트 + 차트 공유) ──
+    _color_map_all = _build_color_map(_all_perfs)
 
     # ── 체크리스트 테이블 CSS (외곽선·행/열 구분선) ──
     st.markdown('''<style>
@@ -859,15 +894,9 @@ if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in 
                         selected.append(pname)
             return selected
 
-    # ── 상업성: 표 + 차트 좌우 배치 ──
-    _comm_tbl, _comm_chart = st.columns([1, 1])
-    _sel_commercial = _render_checklist(_comm_tbl, "상업성", _commercial, "_trend_ed_commercial", _color_map_commercial)
-
-    # ── 공공성: 표 + 차트 좌우 배치 ──
-    _pub_tbl, _pub_chart = st.columns([1, 1])
-    _sel_public = _render_checklist(_pub_tbl, "공공성", _public, "_trend_ed_public", _color_map_public)
-
-    selected_perfs = _sel_commercial + _sel_public
+    # ── 통합: 테이블 + 차트 좌우 배치 ──
+    _trend_tbl, _trend_chart = st.columns([1, 1])
+    selected_perfs = _render_checklist(_trend_tbl, "③ 공연 선택", _all_perfs, "_trend_ed_all", _color_map_all)
 
     # ── 공통 데이터 준비 ──
     filtered_trend = trend_df[trend_df['공연명'].isin(selected_perfs)].copy()
@@ -932,7 +961,7 @@ if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in 
             )
         filtered_trend = filtered_trend.dropna(subset=[_y_col]).sort_values('기준일자')
 
-    # ── 공연별 티켓오픈일 맵 (정체 감지용, 30일 경과 판정) ──
+    # ── 공연별 티켓오픈일 맵 (정체 감지용, 21일 경과 판정) ──
     _ticket_open_map = {}
     for pname in _default_perfs:
         _m = _match_master(pname, master_df)
@@ -995,27 +1024,9 @@ if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in 
                 else:
                     _ytick_texts.append(txt)
 
-            # ── 목표 점유율 점선 (점유율 모드만) ──
-            if _y_col == '점유율(%)':
-                _targets = set()
-                for pname in cat_selected:
-                    t = _get_target_occ(pname)
-                    if t is not None:
-                        _targets.add(t)
-                for tgt in _targets:
-                    fig.add_shape(
-                        type='line', x0=0, x1=1, xref='paper',
-                        y0=tgt, y1=tgt, yref='y',
-                        line=dict(color='#FFD700', dash='dash', width=1),
-                    )
-                    if tgt not in _yticks:
-                        _yticks.append(tgt)
-                        _ytick_texts.append(
-                            f'<span style="color:#FFD700;font-weight:bold">{tgt:.0f}</span>'
-                        )
 
             fig.update_layout(
-                xaxis_title="", yaxis_title="", height=350,
+                xaxis_title="", yaxis_title="",
                 margin=dict(t=50, b=30, l=50, r=20),
                 showlegend=False,
                 yaxis=dict(range=[0, _y_upper], tickvals=_yticks, ticktext=_ytick_texts),
@@ -1030,37 +1041,49 @@ if not trend_df.empty and '기준일자' in trend_df.columns and '공연명' in 
             # ── 정체 감지 annotation ──
             _now = pd.Timestamp.now()
             for pname in cat_selected:
-                # 30일 미경과 공연은 스킵
+                # 21일 미경과 공연은 스킵
                 _open_dt = _ticket_open_map.get(pname)
-                if _open_dt is None or pd.isna(_open_dt) or (_now - _open_dt).days < 30:
+                if _open_dt is None or pd.isna(_open_dt) or (_now - _open_dt).days < 21:
                     continue
                 _pdata = cat_data[cat_data['공연명'] == pname].sort_values('기준일자')
                 if len(_pdata) < 3:
                     continue
                 _vals = _pdata[_y_col].values
-                _dates = _pdata['기준일자'].values
+                _dates = _pdata['기준일자'].tolist()
                 _deltas = np.diff(_vals)
                 _avg_delta = np.mean(_deltas)
                 if _avg_delta <= 0:
                     continue
                 _threshold = _avg_delta * 0.5
-                # 정체 판정 + 연속 시 첫 번째만 표기
-                _prev_stag = False
+                # 정체 segment 추적 후 각 segment 중간 지점에 표시
+                segments = []
+                in_stag = False
+                seg_start = None
                 for j, d in enumerate(_deltas):
-                    is_stag = d <= _threshold
-                    if is_stag and not _prev_stag:
-                        _line_color = color_map.get(pname, '#FF6666')
-                        fig.add_annotation(
-                            x=_dates[j + 1], y=float(_vals[j + 1]),
-                            text="정체", showarrow=False,
-                            font=dict(size=9, color=get_contrast_text_color(_line_color)),
-                            bgcolor=_line_color, borderpad=2,
-                            yshift=10, xanchor='center',
-                        )
-                    _prev_stag = is_stag
+                    if d <= _threshold:
+                        if not in_stag:
+                            seg_start = j
+                            in_stag = True
+                    else:
+                        if in_stag:
+                            segments.append((seg_start, j - 1))
+                            in_stag = False
+                if in_stag:
+                    segments.append((seg_start, len(_deltas) - 1))
+                for seg_s, seg_e in segments:
+                    val_s = seg_s + 1
+                    val_e = seg_e + 1
+                    mid_idx = (val_s + val_e) // 2
+                    _line_color = color_map.get(pname, '#FF6666')
+                    fig.add_annotation(
+                        x=_dates[mid_idx], y=float(_vals[mid_idx]),
+                        text="정체", showarrow=False,
+                        font=dict(size=9, color=get_contrast_text_color(_line_color)),
+                        bgcolor=_line_color, borderpad=2,
+                        yshift=10, xanchor='center',
+                    )
 
             fig = apply_common_layout(fig)
             st.plotly_chart(fig, use_container_width=True)
 
-    _render_chart(_comm_chart, "상업성", _commercial, _color_map_commercial)
-    _render_chart(_pub_chart, "공공성", _public, _color_map_public)
+    _render_chart(_trend_chart, "판매추이", _all_perfs, _color_map_all)
