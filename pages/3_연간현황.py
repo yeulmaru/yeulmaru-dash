@@ -169,28 +169,31 @@ if detail_df is not None and not detail_df.empty:
             _open = int(r['_오픈합계']) if pd.notna(r['_오픈합계']) else 0
             _occ = r['_평균점유율']
             _rounds = int(r['_회차수'])
+            _genre = str(r['_장르']) if pd.notna(r['_장르']) else ''
             _tbl_rows.append(
                 f'<tr>'
-                f'<td style="padding:6px 10px;color:{_W};">{_date_str}</td>'
-                f'<td style="padding:6px 10px;color:{_W};">{r["공연명"]}</td>'
-                f'<td style="padding:6px 10px;text-align:center;color:{_W};">{_rounds}</td>'
-                f'<td style="padding:6px 10px;text-align:right;color:{_Y};">{_paid:,}</td>'
-                f'<td style="padding:6px 10px;text-align:right;color:{_W};">{_open:,}</td>'
-                f'<td style="padding:6px 10px;text-align:right;color:{_G};font-weight:700;">{_occ:.1f}</td>'
-                f'<td style="padding:6px 10px;text-align:right;color:{_G};">-</td>'
+                f'<td style="padding:6px 10px;width:8%;color:{_W};">{_date_str}</td>'
+                f'<td style="padding:6px 10px;width:32%;color:{_W};">{r["공연명"]}</td>'
+                f'<td style="padding:6px 10px;width:11%;color:{_W};">{_genre}</td>'
+                f'<td style="padding:6px 10px;width:6%;text-align:center;color:{_W};">{_rounds}</td>'
+                f'<td style="padding:6px 10px;width:10%;text-align:right;color:{_Y};">{_paid:,}</td>'
+                f'<td style="padding:6px 10px;width:10%;text-align:right;color:{_W};">{_open:,}</td>'
+                f'<td style="padding:6px 10px;width:8%;text-align:right;color:{_G};font-weight:700;">{_occ:.1f}</td>'
+                f'<td style="padding:6px 10px;width:11%;text-align:right;color:{_G};">-</td>'
                 f'</tr>'
             )
 
         _tbl_html = (
             f'<table style="width:100%;border-collapse:collapse;font-size:15px;margin-top:16px;">'
             f'<tr style="background:{_HDR_BG};border-bottom:1px solid #444;">'
-            f'<th style="padding:8px 10px;text-align:left;font-weight:700;">공연일</th>'
-            f'<th style="padding:8px 10px;text-align:left;font-weight:700;">공연명</th>'
-            f'<th style="padding:8px 10px;text-align:center;font-weight:700;">회차</th>'
-            f'<th style="padding:8px 10px;text-align:right;font-weight:700;">판매좌석(석)</th>'
-            f'<th style="padding:8px 10px;text-align:right;font-weight:700;">오픈석(석)</th>'
-            f'<th style="padding:8px 10px;text-align:right;font-weight:700;">점유율(%)</th>'
-            f'<th style="padding:8px 10px;text-align:right;font-weight:700;">판매금액(만원)</th>'
+            f'<th style="padding:8px 10px;width:8%;text-align:left;font-weight:700;">공연일</th>'
+            f'<th style="padding:8px 10px;width:32%;text-align:left;font-weight:700;">공연명</th>'
+            f'<th style="padding:8px 10px;width:11%;text-align:left;font-weight:700;">장르</th>'
+            f'<th style="padding:8px 10px;width:6%;text-align:center;font-weight:700;">회차</th>'
+            f'<th style="padding:8px 10px;width:10%;text-align:right;font-weight:700;">판매좌석(석)</th>'
+            f'<th style="padding:8px 10px;width:10%;text-align:right;font-weight:700;">오픈석(석)</th>'
+            f'<th style="padding:8px 10px;width:8%;text-align:right;font-weight:700;">점유율(%)</th>'
+            f'<th style="padding:8px 10px;width:11%;text-align:right;font-weight:700;">판매금액(만원)</th>'
             f'</tr>'
             + ''.join(_tbl_rows)
             + '</table>'
