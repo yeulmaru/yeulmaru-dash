@@ -1,6 +1,6 @@
 import streamlit as st
 import pandas as pd
-from datetime import date, datetime
+from datetime import date, datetime, timezone, timedelta
 import time
 import re
 
@@ -31,6 +31,8 @@ save_daily_entry = save_daily_entry_cloud if _IS_CLOUD else save_daily_entry_loc
 # ── 상수 ──
 WEEKDAYS_KR = ['월', '화', '수', '목', '금', '토', '일']
 ACCENT = COLORS['primary']
+LBL_BLUE = '#00BFFF'
+KST = timezone(timedelta(hours=9))
 
 # ── 세션 초기화 ──
 if "has_unsaved_changes" not in st.session_state:
@@ -495,7 +497,7 @@ for card_idx, (_, perf) in enumerate(active_df.iterrows()):
         # 우측: 미니 표 (전치: 2행×5열)
         _TD = 'padding:3px 12px;'
         _TDR = 'padding:3px 12px;text-align:right;'
-        _TDH = 'padding:3px 12px;text-align:center;color:#FFFFFF;font-weight:700;font-size:15px;'
+        _TDH = f'padding:3px 12px;text-align:center;color:{LBL_BLUE};font-weight:700;font-size:15px;'
         _DIM = '#999999'
         def _sign(n):
             return f"+{n:,}" if n > 0 else (f"{n:,}" if n < 0 else "0")
@@ -511,14 +513,14 @@ for card_idx, (_, perf) in enumerate(active_df.iterrows()):
             f'<td style="{_TDH}">목표대비</td>'
             f'</tr>'
             f'<tr>'
-            f'<td style="{_TD}">객석 (수)</td>'
+            f'<td style="{_TD}color:{LBL_BLUE};font-weight:700;">객석 (수)</td>'
             f'<td style="{_TDR}"><span style="color:{_G};font-weight:700;">{_fs(_hdr_seats)}</span></td>'
             f'<td style="{_TDR}"><span style="color:{_Y};font-weight:700;">{_fs(_hdr_tgt_seats)}</span></td>'
             f'<td style="{_TDR}">{_fs(_hdr_avail)}</td>'
             f'<td style="{_TDR}"><span style="color:{_diff_s_color};font-weight:700;">{_sign(_hdr_diff_seats)}</span></td>'
             f'</tr>'
             f'<tr>'
-            f'<td style="{_TD}">점유율 (%)</td>'
+            f'<td style="{_TD}color:{LBL_BLUE};font-weight:700;">점유율 (%)</td>'
             f'<td style="{_TDR}"><span style="color:{_G};font-weight:700;">{_hdr_occ_i}</span></td>'
             f'<td style="{_TDR}"><span style="color:{_Y};font-weight:700;">{_hdr_tgt_i}</span></td>'
             f'<td style="{_TDR}">{_hdr_avail_pct}</td>'
@@ -536,22 +538,23 @@ for card_idx, (_, perf) in enumerate(active_df.iterrows()):
 
         if total_rounds > 1 and perf_rounds_info:
             _h = st.columns([0.4, 0.9, 0.6, 0.8, 0.8, 0.8])
-            _h[0].markdown('<div style="font-size:21px;font-weight:700;">#</div>', unsafe_allow_html=True)
-            _h[1].markdown('<div style="font-size:21px;font-weight:700;">공연일/시각</div>', unsafe_allow_html=True)
-            _h[2].markdown('<div style="font-size:21px;font-weight:700;">가용석</div>', unsafe_allow_html=True)
-            _h[3].markdown("**유료좌석**")
-            _h[4].markdown("**유료금액**")
-            _h[5].markdown("**무료좌석**")
+            _h[0].markdown(f'<div style="font-size:21px;font-weight:700;text-align:center;color:{LBL_BLUE};">#</div>', unsafe_allow_html=True)
+            _h[1].markdown(f'<div style="font-size:21px;font-weight:700;text-align:center;color:{LBL_BLUE};">공연일/시각</div>', unsafe_allow_html=True)
+            _h[2].markdown(f'<div style="font-size:21px;font-weight:700;text-align:center;color:{LBL_BLUE};">판매석</div>', unsafe_allow_html=True)
+            _h[3].markdown(f'<div style="font-size:14px;font-weight:700;text-align:center;color:{LBL_BLUE};">유료좌석</div>', unsafe_allow_html=True)
+            _h[4].markdown(f'<div style="font-size:14px;font-weight:700;text-align:center;color:{LBL_BLUE};">유료금액</div>', unsafe_allow_html=True)
+            _h[5].markdown(f'<div style="font-size:14px;font-weight:700;text-align:center;color:{LBL_BLUE};">무료좌석</div>', unsafe_allow_html=True)
 
             for rd_info in perf_rounds_info:
                 rn = rd_info['round_no']
                 cols = st.columns([0.4, 0.9, 0.6, 0.8, 0.8, 0.8])
                 with cols[0]:
-                    st.markdown(f'<div style="font-size:21px;">{rn}</div>', unsafe_allow_html=True)
+                    st.markdown(f'<div style="font-size:21px;text-align:center;">{rn}</div>', unsafe_allow_html=True)
                 with cols[1]:
                     st.markdown(f'<div style="font-size:21px;">{rd_info["date"]} {rd_info["time"]}</div>', unsafe_allow_html=True)
                 with cols[2]:
-                    st.markdown(f'<div style="font-size:21px;">{rd_info["seat"]:,}</div>', unsafe_allow_html=True)
+                    _rd_sold = round(cur_seats / total_rounds) if total_rounds > 0 else 0
+                    st.markdown(f'<div style="font-size:21px;text-align:right;color:{ACCENT};font-weight:700;">{_rd_sold:,}</div>', unsafe_allow_html=True)
 
                 result = _render_input_row(
                     perf_id, rn, rd_info['seat'],
@@ -570,9 +573,9 @@ for card_idx, (_, perf) in enumerate(active_df.iterrows()):
                 )
         else:
             _h = st.columns(3)
-            _h[0].markdown("**유료좌석**")
-            _h[1].markdown("**유료금액**")
-            _h[2].markdown("**무료좌석**")
+            _h[0].markdown(f'<div style="font-size:14px;font-weight:700;text-align:center;color:{LBL_BLUE};">유료좌석</div>', unsafe_allow_html=True)
+            _h[1].markdown(f'<div style="font-size:14px;font-weight:700;text-align:center;color:{LBL_BLUE};">유료금액</div>', unsafe_allow_html=True)
+            _h[2].markdown(f'<div style="font-size:14px;font-weight:700;text-align:center;color:{LBL_BLUE};">무료좌석</div>', unsafe_allow_html=True)
 
             input_cols = st.columns(3)
             result = _render_input_row(
@@ -603,7 +606,7 @@ for card_idx, (_, perf) in enumerate(active_df.iterrows()):
         _has_prev_save = _last_cur_key in st.session_state
 
         _CELL = 'padding:7px 0;text-align:right;'
-        _HDR = f'{_CELL}font-size:21px;font-weight:700;color:#FFFFFF;'
+        _HDR = f'{_CELL}font-size:21px;font-weight:700;color:{LBL_BLUE};'
         _LBL = 'padding:7px 0;font-size:21px;font-weight:600;'
 
         def _row_style(color):
@@ -708,7 +711,7 @@ for card_idx, (_, perf) in enumerate(active_df.iterrows()):
                         '합계금액': cur_amount,
                         '기준일자': current.get('기준일자'),
                     }
-                    _save_time = datetime.now().strftime('%H:%M')
+                    _save_time = datetime.now(KST).strftime('%H:%M')
                     st.session_state[_last_cur_key + "_label"] = f"{_fmt_date_wd(today)} {_save_time}"
                     st.session_state[_last_cur_key + "_save_hhmm"] = _save_time
                     # 이 카드의 입력 필드 초기화 (counter 증가 → 위젯 재생성)
@@ -793,7 +796,7 @@ if has_any:
             st.session_state.save_results = all_results
             if all(r['status'] != 'error' for r in all_results):
                 # 직전 값 session_state에 저장 + 입력 필드 초기화
-                _save_time = datetime.now().strftime('%H:%M')
+                _save_time = datetime.now(KST).strftime('%H:%M')
                 for _c in input_cards:
                     _pid = _c['perf']['ID']
                     _cur = _c.get('current') or {}
