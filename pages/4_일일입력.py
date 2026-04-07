@@ -598,29 +598,13 @@ for card_idx, (_, perf) in enumerate(active_df.iterrows()):
         in_seats = sum(r['합계좌석'] for r in round_results)
         in_amount = sum(r['합계금액'] for r in round_results)
 
-        # ── 비교 표 (직전 / 현재 / 변경) ──
-        # 직전 저장값: session_state 우선 (같은 세션 누적), DB fallback
+        # ── 비교 표 (최신 저장 1건 / 저장 후 과거+현재) ──
         _last_cur_key = f"last_cur_{perf_id}"
-        if _last_cur_key in st.session_state:
-            _p = st.session_state[_last_cur_key]
-            _p_label = st.session_state.get(_last_cur_key + "_label", "직전")
-        elif prev_entry:
-            _p = prev_entry
-            _p_label = _fmt_date_wd(_p.get('기준일자'))
-        else:
-            _p = None
-            _p_label = "최초입력"
-        _p_seats = int(_p.get('합계좌석', 0)) if _p else None
-        _p_amount = int(_p.get('합계금액', 0)) if _p else None
-        _p_occ = (_p_seats / total_open * 100) if _p and total_open > 0 else None
-        _p_vs_tgt = (_p_occ - target_occ) if _p_occ is not None else None
-
-        # 입력값 점유율
-        in_occ = (in_seats / total_open * 100) if total_open > 0 else 0.0
+        _has_prev_save = _last_cur_key in st.session_state
 
         _CELL = 'padding:7px 0;text-align:right;'
         _HDR = f'{_CELL}font-size:21px;font-weight:700;color:#FFFFFF;'
-        _V_PREV = f'{_CELL}font-size:21px;color:#AAA;'
+        _V_PREV = f'{_CELL}font-size:21px;color:#999;'
         _V_CUR = f'{_CELL}font-size:21px;font-weight:700;color:{ACCENT};'
         _V_CHG = f'{_CELL}font-size:21px;font-weight:700;'
         _LBL = 'padding:7px 0;font-size:21px;font-weight:600;'
@@ -637,43 +621,50 @@ for card_idx, (_, perf) in enumerate(active_df.iterrows()):
         _hc[4].markdown(f'<div style="{_HDR}">점유율</div>', unsafe_allow_html=True)
         _hc[5].markdown(f'<div style="{_HDR}">목표대비</div>', unsafe_allow_html=True)
 
-        # 직전 행
-        _r1 = st.columns(_COL_RATIO)
-        _r1[1].markdown(f'<div style="{_LBL}color:#888;">{_p_label}</div>', unsafe_allow_html=True)
-        if _p:
+        if _has_prev_save:
+            # 상태 B: 이번 세션에서 저장 후 → 과거 행 + 현재 행
+            _p = st.session_state[_last_cur_key]
+            _p_label = st.session_state.get(_last_cur_key + "_label", "직전")
+            _p_seats = int(_p.get('합계좌석', 0))
+            _p_amount = int(_p.get('합계금액', 0))
+            _p_occ = (_p_seats / total_open * 100) if total_open > 0 else 0.0
+            _p_vs_tgt = _p_occ - target_occ
+
+            # 과거 행 (직전 저장값 snapshot)
+            _r1 = st.columns(_COL_RATIO)
+            _r1[1].markdown(f'<div style="{_LBL}color:#999;">{_p_label}</div>', unsafe_allow_html=True)
             _pv_sign = "+" if _p_vs_tgt >= 0 else ""
             _r1[2].markdown(f'<div style="{_V_PREV}">{_p_seats:,}석</div>', unsafe_allow_html=True)
             _r1[3].markdown(f'<div style="{_V_PREV}">{_p_amount/10000:,.1f}만원</div>', unsafe_allow_html=True)
             _r1[4].markdown(f'<div style="{_V_PREV}">{_p_occ:.1f}%</div>', unsafe_allow_html=True)
             _r1[5].markdown(f'<div style="{_V_PREV}">{_pv_sign}{_p_vs_tgt:.1f}%p</div>', unsafe_allow_html=True)
+
+            # 현재 행 (방금 저장한 값 = DB 최신)
+            _save_hhmm = st.session_state.get(_last_cur_key + "_save_hhmm", "")
+            _cur_label = f"현재 {_save_hhmm}" if _save_hhmm else "현재"
+            _r2 = st.columns(_COL_RATIO)
+            _r2[1].markdown(f'<div style="{_LBL}color:{ACCENT};">{_cur_label}</div>', unsafe_allow_html=True)
+            _r2[2].markdown(f'<div style="{_V_CUR}">{cur_seats:,}석</div>', unsafe_allow_html=True)
+            _r2[3].markdown(f'<div style="{_V_CUR}">{cur_amount/10000:,.1f}만원</div>', unsafe_allow_html=True)
+            _r2[4].markdown(f'<div style="{_V_CUR}">{cur_occ:.1f}%</div>', unsafe_allow_html=True)
+            _cv_sign = "+" if cur_vs_tgt >= 0 else ""
+            _cv_color = ACCENT if cur_vs_tgt >= 0 else "#FF4B4B"
+            _r2[5].markdown(f'<div style="{_V_CHG}color:{_cv_color};">{_cv_sign}{cur_vs_tgt:.1f}%p</div>', unsafe_allow_html=True)
         else:
-            for _cc in _r1[2:6]:
-                _cc.markdown(f'<div style="{_V_PREV}">—</div>', unsafe_allow_html=True)
-
-        # 현재 행 (DB 마지막 저장값, 입력 반영 안 함)
-        _r2 = st.columns(_COL_RATIO)
-        _r2[1].markdown(f'<div style="{_LBL}color:#FFF;">현재</div>', unsafe_allow_html=True)
-        _r2[2].markdown(f'<div style="{_V_CUR}">{cur_seats:,}석</div>', unsafe_allow_html=True)
-        _r2[3].markdown(f'<div style="{_V_CUR}">{cur_amount/10000:,.1f}만원</div>', unsafe_allow_html=True)
-        _r2[4].markdown(f'<div style="{_V_CUR}">{cur_occ:.1f}%</div>', unsafe_allow_html=True)
-        _cv_sign = "+" if cur_vs_tgt >= 0 else ""
-        _cv_color = ACCENT if cur_vs_tgt >= 0 else "#FF4B4B"
-        _r2[5].markdown(f'<div style="{_V_CHG}color:{_cv_color};">{_cv_sign}{cur_vs_tgt:.1f}%p</div>', unsafe_allow_html=True)
-
-        # 변경 행 (입력 있을 때만)
-        if has_input_data:
-            _r3 = st.columns(_COL_RATIO)
-            _r3[1].markdown(f'<div style="{_LBL}color:#FFD700;">(변경)</div>', unsafe_allow_html=True)
-
-            def _chg_html(val, fmt_str):
-                _c = ACCENT if val >= 0 else "#FF4B4B"
-                _s = "▲ +" if val > 0 else ("▼ " if val < 0 else "")
-                return f'<div style="{_V_CHG}color:{_c};">{_s}{fmt_str}</div>'
-
-            _r3[2].markdown(_chg_html(in_seats, f"{in_seats:,}석"), unsafe_allow_html=True)
-            _r3[3].markdown(_chg_html(in_amount, f"{in_amount/10000:,.1f}만원"), unsafe_allow_html=True)
-            _r3[4].markdown(_chg_html(in_occ, f"{in_occ:.1f}%p"), unsafe_allow_html=True)
-            _r3[5].markdown(_chg_html(in_occ, f"{in_occ:.1f}%p"), unsafe_allow_html=True)
+            # 상태 A: 저장 전 → 최신 저장 1건만 표시
+            _cur_date_label = _fmt_date_wd(current.get('기준일자')) if current.get('기준일자') else "현재"
+            _r1 = st.columns(_COL_RATIO)
+            _r1[1].markdown(f'<div style="{_LBL}color:#FFF;">{_cur_date_label}</div>', unsafe_allow_html=True)
+            if cur_seats > 0 or cur_amount > 0:
+                _r1[2].markdown(f'<div style="{_V_CUR}">{cur_seats:,}석</div>', unsafe_allow_html=True)
+                _r1[3].markdown(f'<div style="{_V_CUR}">{cur_amount/10000:,.1f}만원</div>', unsafe_allow_html=True)
+                _r1[4].markdown(f'<div style="{_V_CUR}">{cur_occ:.1f}%</div>', unsafe_allow_html=True)
+                _cv_sign = "+" if cur_vs_tgt >= 0 else ""
+                _cv_color = ACCENT if cur_vs_tgt >= 0 else "#FF4B4B"
+                _r1[5].markdown(f'<div style="{_V_CHG}color:{_cv_color};">{_cv_sign}{cur_vs_tgt:.1f}%p</div>', unsafe_allow_html=True)
+            else:
+                for _cc in _r1[2:6]:
+                    _cc.markdown(f'<div style="{_V_PREV}">—</div>', unsafe_allow_html=True)
 
         st.markdown('<div style="margin-bottom:20px;"></div>', unsafe_allow_html=True)
 
@@ -712,6 +703,7 @@ for card_idx, (_, perf) in enumerate(active_df.iterrows()):
                     }
                     _save_time = datetime.now().strftime('%H:%M')
                     st.session_state[_last_cur_key + "_label"] = f"{_fmt_date_wd(today)} {_save_time}"
+                    st.session_state[_last_cur_key + "_save_hhmm"] = _save_time
                     # 이 카드의 입력 필드 초기화 (counter 증가 → 위젯 재생성)
                     for _rn in range(1, total_rounds + 1):
                         _ckey = f"counter_{perf_id}_{_rn}"
@@ -805,6 +797,7 @@ if has_any:
                         '기준일자': _cur.get('기준일자'),
                     }
                     st.session_state[_last_cur_key + "_label"] = f"{_fmt_date_wd(today)} {_save_time}"
+                    st.session_state[_last_cur_key + "_save_hhmm"] = _save_time
                     _tr = int(_c['perf']['총회차']) if pd.notna(_c['perf']['총회차']) else 1
                     for _rn in range(1, _tr + 1):
                         _ckey = f"counter_{_pid}_{_rn}"
