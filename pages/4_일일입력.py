@@ -583,11 +583,11 @@ for card_idx, (_, perf) in enumerate(active_df.iterrows()):
                     st.session_state.save_results.append(sr)
 
                 if all(sr['status'] != 'error' for sr in save_res):
-                    # 이 카드의 입력 필드 session_state 초기화
+                    # 이 카드의 입력 필드 session_state 0으로 리셋
                     _prefix = f"input_{perf_id}_"
                     for _k in list(st.session_state.keys()):
                         if _k.startswith(_prefix):
-                            del st.session_state[_k]
+                            st.session_state[_k] = 0
                     st.session_state.has_unsaved_changes = False
                     st.cache_data.clear()
                     st.rerun()
@@ -664,13 +664,13 @@ if has_any:
 
             st.session_state.save_results = all_results
             if all(r['status'] != 'error' for r in all_results):
-                # 성공한 카드들의 입력 필드 초기화
+                # 성공한 카드들의 입력 필드 0으로 리셋
                 for _c in input_cards:
                     _pid = _c['perf']['ID']
                     _prefix = f"input_{_pid}_"
                     for _k in list(st.session_state.keys()):
                         if _k.startswith(_prefix):
-                            del st.session_state[_k]
+                            st.session_state[_k] = 0
                 st.session_state.has_unsaved_changes = False
                 st.cache_data.clear()
             else:
