@@ -256,6 +256,25 @@ def _badge_html(category):
             f'border-radius:10px;font-size:12px;font-weight:600;">{category}</span>')
 
 
+def _dday_badge(start_dt, today_ts):
+    """D-day 배지 HTML 반환 (모서리 둥근 네모)"""
+    if pd.isna(start_dt):
+        return ''
+    days = (pd.Timestamp(start_dt) - today_ts).days
+    if days < 0:
+        text, bg = f"D+{-days}", "#888888"
+    elif days == 0:
+        text, bg = "D-Day", "#FF8C00"
+    elif days <= 7:
+        text, bg = f"D-{days}", "#FF8C00"
+    elif days <= 28:
+        text, bg = f"D-{days}", "#FFD700"
+    else:
+        text, bg = f"D-{days}", "#FFFFFF"
+    return (f'<span style="background:{bg};color:#000000;padding:2px 10px;'
+            f'border-radius:10px;font-size:12px;font-weight:600;">{text}</span>')
+
+
 def _match_prev(perf_name, prev_data):
     perf_s = str(perf_name).strip()
     for key, val in prev_data.items():
@@ -433,19 +452,11 @@ for card_idx, (_, perf) in enumerate(active_df.iterrows()):
 
     # ── 카드 ──
     with st.container(border=True):
-        hdr_l, hdr_r = st.columns([6, 1])
-        with hdr_l:
-            st.markdown(
-                f'{_badge_html(category)} &nbsp; '
-                f'<span style="font-size:20px;font-weight:700;color:{ACCENT};">{perf_name}</span>',
-                unsafe_allow_html=True,
-            )
-        with hdr_r:
-            st.markdown(
-                f'<div style="text-align:right;font-size:20px;font-weight:700;'
-                f'color:{dday_color};">{dday_text}</div>',
-                unsafe_allow_html=True,
-            )
+        st.markdown(
+            f'{_dday_badge(start_dt, today)} &nbsp; '
+            f'<span style="font-size:20px;font-weight:700;color:{ACCENT};">{perf_name}</span>',
+            unsafe_allow_html=True,
+        )
 
         ic = st.columns(4)
         ic[0].markdown(f"**공연일** &nbsp; {date_range}")
@@ -547,12 +558,12 @@ for card_idx, (_, perf) in enumerate(active_df.iterrows()):
         # 입력값 점유율
         in_occ = (in_seats / total_open * 100) if total_open > 0 else 0.0
 
-        _CELL = 'padding:7px 0;'
+        _CELL = 'padding:7px 0;text-align:right;'
         _HDR = f'{_CELL}font-size:21px;font-weight:700;color:#FFFFFF;'
         _V_PREV = f'{_CELL}font-size:21px;color:#AAA;'
         _V_CUR = f'{_CELL}font-size:21px;font-weight:700;color:{ACCENT};'
         _V_CHG = f'{_CELL}font-size:21px;font-weight:700;'
-        _LBL = f'{_CELL}font-size:21px;font-weight:600;'
+        _LBL = 'padding:7px 0;font-size:21px;font-weight:600;'
 
         st.markdown('<div style="margin-top:20px;"></div>', unsafe_allow_html=True)
         st.markdown("---")
