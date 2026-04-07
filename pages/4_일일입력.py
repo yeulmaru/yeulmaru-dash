@@ -604,10 +604,10 @@ for card_idx, (_, perf) in enumerate(active_df.iterrows()):
 
         _CELL = 'padding:7px 0;text-align:right;'
         _HDR = f'{_CELL}font-size:21px;font-weight:700;color:#FFFFFF;'
-        _V_PREV = f'{_CELL}font-size:21px;color:#999;'
-        _V_CUR = f'{_CELL}font-size:21px;font-weight:700;color:{ACCENT};'
-        _V_CHG = f'{_CELL}font-size:21px;font-weight:700;'
         _LBL = 'padding:7px 0;font-size:21px;font-weight:600;'
+
+        def _row_style(color):
+            return f'{_CELL}font-size:21px;font-weight:700;color:{color};'
 
         st.markdown('<div style="margin-top:20px;"></div>', unsafe_allow_html=True)
         st.markdown("---")
@@ -621,6 +621,14 @@ for card_idx, (_, perf) in enumerate(active_df.iterrows()):
         _hc[4].markdown(f'<div style="{_HDR}">점유율</div>', unsafe_allow_html=True)
         _hc[5].markdown(f'<div style="{_HDR}">목표대비</div>', unsafe_allow_html=True)
 
+        def _render_data_row(cols, color, seats, amount, occ, vs_tgt):
+            _s = _row_style(color)
+            _sign = "+" if vs_tgt >= 0 else ""
+            cols[2].markdown(f'<div style="{_s}">{seats:,}석</div>', unsafe_allow_html=True)
+            cols[3].markdown(f'<div style="{_s}">{amount/10000:,.1f}만원</div>', unsafe_allow_html=True)
+            cols[4].markdown(f'<div style="{_s}">{occ:.1f}%</div>', unsafe_allow_html=True)
+            cols[5].markdown(f'<div style="{_s}">{_sign}{vs_tgt:.1f}%p</div>', unsafe_allow_html=True)
+
         if _has_prev_save:
             # 상태 B: 이번 세션에서 저장 후 → 과거 행 + 현재 행
             _p = st.session_state[_last_cur_key]
@@ -630,41 +638,30 @@ for card_idx, (_, perf) in enumerate(active_df.iterrows()):
             _p_occ = (_p_seats / total_open * 100) if total_open > 0 else 0.0
             _p_vs_tgt = _p_occ - target_occ
 
-            # 과거 행 (직전 저장값 snapshot)
+            # 과거 행 (항상 #999)
             _r1 = st.columns(_COL_RATIO)
             _r1[1].markdown(f'<div style="{_LBL}color:#999;">{_p_label}</div>', unsafe_allow_html=True)
-            _pv_sign = "+" if _p_vs_tgt >= 0 else ""
-            _r1[2].markdown(f'<div style="{_V_PREV}">{_p_seats:,}석</div>', unsafe_allow_html=True)
-            _r1[3].markdown(f'<div style="{_V_PREV}">{_p_amount/10000:,.1f}만원</div>', unsafe_allow_html=True)
-            _r1[4].markdown(f'<div style="{_V_PREV}">{_p_occ:.1f}%</div>', unsafe_allow_html=True)
-            _r1[5].markdown(f'<div style="{_V_PREV}">{_pv_sign}{_p_vs_tgt:.1f}%p</div>', unsafe_allow_html=True)
+            _render_data_row(_r1, '#999', _p_seats, _p_amount, _p_occ, _p_vs_tgt)
 
-            # 현재 행 (방금 저장한 값 = DB 최신)
+            # 현재 행: 변경 후 행 뜨면 #999, 아니면 ACCENT
             _save_hhmm = st.session_state.get(_last_cur_key + "_save_hhmm", "")
             _cur_label = f"현재 {_save_hhmm}" if _save_hhmm else "현재"
+            _base_color = '#999' if has_input_data else ACCENT
             _r2 = st.columns(_COL_RATIO)
-            _r2[1].markdown(f'<div style="{_LBL}color:{ACCENT};">{_cur_label}</div>', unsafe_allow_html=True)
-            _r2[2].markdown(f'<div style="{_V_CUR}">{cur_seats:,}석</div>', unsafe_allow_html=True)
-            _r2[3].markdown(f'<div style="{_V_CUR}">{cur_amount/10000:,.1f}만원</div>', unsafe_allow_html=True)
-            _r2[4].markdown(f'<div style="{_V_CUR}">{cur_occ:.1f}%</div>', unsafe_allow_html=True)
-            _cv_sign = "+" if cur_vs_tgt >= 0 else ""
-            _cv_color = ACCENT if cur_vs_tgt >= 0 else "#FF4B4B"
-            _r2[5].markdown(f'<div style="{_V_CHG}color:{_cv_color};">{_cv_sign}{cur_vs_tgt:.1f}%p</div>', unsafe_allow_html=True)
+            _r2[1].markdown(f'<div style="{_LBL}color:{_base_color};">{_cur_label}</div>', unsafe_allow_html=True)
+            _render_data_row(_r2, _base_color, cur_seats, cur_amount, cur_occ, cur_vs_tgt)
         else:
             # 상태 A: 저장 전 → 최신 저장 1건만 표시
             _cur_date_label = _fmt_date_wd(current.get('기준일자')) if current.get('기준일자') else "현재"
+            _base_color = '#999' if has_input_data else '#FFFFFF'
             _r1 = st.columns(_COL_RATIO)
-            _r1[1].markdown(f'<div style="{_LBL}color:#FFF;">{_cur_date_label}</div>', unsafe_allow_html=True)
+            _r1[1].markdown(f'<div style="{_LBL}color:{_base_color};">{_cur_date_label}</div>', unsafe_allow_html=True)
             if cur_seats > 0 or cur_amount > 0:
-                _r1[2].markdown(f'<div style="{_V_CUR}">{cur_seats:,}석</div>', unsafe_allow_html=True)
-                _r1[3].markdown(f'<div style="{_V_CUR}">{cur_amount/10000:,.1f}만원</div>', unsafe_allow_html=True)
-                _r1[4].markdown(f'<div style="{_V_CUR}">{cur_occ:.1f}%</div>', unsafe_allow_html=True)
-                _cv_sign = "+" if cur_vs_tgt >= 0 else ""
-                _cv_color = ACCENT if cur_vs_tgt >= 0 else "#FF4B4B"
-                _r1[5].markdown(f'<div style="{_V_CHG}color:{_cv_color};">{_cv_sign}{cur_vs_tgt:.1f}%p</div>', unsafe_allow_html=True)
+                _render_data_row(_r1, _base_color, cur_seats, cur_amount, cur_occ, cur_vs_tgt)
             else:
+                _dim = _row_style('#999')
                 for _cc in _r1[2:6]:
-                    _cc.markdown(f'<div style="{_V_PREV}">—</div>', unsafe_allow_html=True)
+                    _cc.markdown(f'<div style="{_dim}">—</div>', unsafe_allow_html=True)
 
         # 변경 미리보기 행 (입력값이 있을 때만)
         if has_input_data:
@@ -674,12 +671,7 @@ for card_idx, (_, perf) in enumerate(active_df.iterrows()):
             _new_vs_tgt = _new_occ - target_occ
             _rp = st.columns(_COL_RATIO)
             _rp[1].markdown(f'<div style="{_LBL}color:{ACCENT};">변경 후</div>', unsafe_allow_html=True)
-            _rp[2].markdown(f'<div style="{_V_CUR}">{_new_seats:,}석</div>', unsafe_allow_html=True)
-            _rp[3].markdown(f'<div style="{_V_CUR}">{_new_amount/10000:,.1f}만원</div>', unsafe_allow_html=True)
-            _rp[4].markdown(f'<div style="{_V_CUR}">{_new_occ:.1f}%</div>', unsafe_allow_html=True)
-            _nv_sign = "+" if _new_vs_tgt >= 0 else ""
-            _nv_color = ACCENT if _new_vs_tgt >= 0 else "#FF4B4B"
-            _rp[5].markdown(f'<div style="{_V_CHG}color:{_nv_color};">{_nv_sign}{_new_vs_tgt:.1f}%p</div>', unsafe_allow_html=True)
+            _render_data_row(_rp, ACCENT, _new_seats, _new_amount, _new_occ, _new_vs_tgt)
 
         st.markdown('<div style="margin-bottom:20px;"></div>', unsafe_allow_html=True)
 
