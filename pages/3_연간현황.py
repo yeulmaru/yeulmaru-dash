@@ -191,7 +191,7 @@ if detail_df is not None and not detail_df.empty:
                 range=[0, 110],
             ),
             height=500,
-            margin=dict(t=40),
+            margin=dict(t=40, r=55),
             showlegend=True,
             legend=dict(
                 orientation='h',
@@ -215,6 +215,40 @@ if detail_df is not None and not detail_df.empty:
                 font=dict(color='#FFFFFF', size=13),
             )],
         )
+        # ── 카테고리별 평균 점선 + 우측 수치 ──
+        _avg_annotations = []
+        _used_y = []
+        for _cat, _color in _s1_color_map.items():
+            _cat_df = _s1_grouped[_s1_grouped[_s1_color_col] == _cat]
+            if _cat_df.empty:
+                continue
+            _avg = _cat_df['_평균점유율'].mean()
+
+            _s1_fig.add_shape(
+                type='line', x0=0.5, x1=12.5, y0=_avg, y1=_avg,
+                line=dict(dash='dash', color=_color, width=1.5),
+                opacity=0.5,
+            )
+
+            # 겹침 방지: 기존 수치와 Y 간격 < 3이면 오프셋
+            _adj_y = _avg
+            for _uy in _used_y:
+                if abs(_adj_y - _uy) < 3:
+                    _adj_y = _uy + 3
+            _used_y.append(_adj_y)
+
+            _avg_annotations.append(dict(
+                x=1.01, y=_adj_y,
+                xref='paper', yref='y',
+                text=f"{_avg:.1f}",
+                showarrow=False,
+                xanchor='left', yanchor='middle',
+                font=dict(color=_color, size=12),
+            ))
+
+        # 기존 annotations에 평균 annotations 추가
+        _s1_fig.layout.annotations = list(_s1_fig.layout.annotations) + _avg_annotations
+
         _s1_fig = apply_common_layout(_s1_fig)
         st.plotly_chart(_s1_fig, use_container_width=True)
 
