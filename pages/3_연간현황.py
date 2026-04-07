@@ -68,12 +68,31 @@ if detail_df is not None and not detail_df.empty:
     _s1_selected_year = st.selectbox("연도 선택", _s1_available_years, index=_s1_default_idx, key="_s1_year")
     _s1_year_df = _s1_df[_s1_df['_년도'] == _s1_selected_year]
 
-    # ── 분류(공연구분) 라디오 ──
+    # ── 분류(공연구분) 체크박스 (최소 1개 강제) ──
     if _s1_perf_type_col:
         _s1_types = sorted(_s1_year_df[_s1_perf_type_col].dropna().astype(str).str.strip().unique())
-        _s1_default_idx = _s1_types.index('기획') if '기획' in _s1_types else 0
-        _s1_sel_type = st.radio("공연구분", _s1_types, index=_s1_default_idx, horizontal=True, key="_s1_type")
-        _s1_year_df = _s1_year_df[_s1_year_df[_s1_perf_type_col].astype(str).str.strip() == _s1_sel_type]
+
+        # session_state 초기화
+        if '_s1_cb_init' not in st.session_state:
+            st.session_state['_s1_cb_init'] = True
+            for t in _s1_types:
+                st.session_state[f'_s1_cb_{t}'] = (t == '기획')
+
+        # 현재 선택 상태 읽기
+        _s1_selected = [t for t in _s1_types if st.session_state.get(f'_s1_cb_{t}', False)]
+        _s1_only_one = len(_s1_selected) == 1
+
+        # 체크박스 가로 배치
+        _s1_cb_cols = st.columns(len(_s1_types))
+        for i, t in enumerate(_s1_types):
+            is_checked = st.session_state.get(f'_s1_cb_{t}', False)
+            is_disabled = _s1_only_one and is_checked
+            _s1_cb_cols[i].checkbox(t, value=is_checked, key=f'_s1_cb_{t}', disabled=is_disabled)
+
+        # 필터 적용
+        _s1_sel_final = [t for t in _s1_types if st.session_state.get(f'_s1_cb_{t}', False)]
+        if _s1_sel_final:
+            _s1_year_df = _s1_year_df[_s1_year_df[_s1_perf_type_col].astype(str).str.strip().isin(_s1_sel_final)]
 
     # ── 공연 단위 그룹화 (공연명 기준) ──
     _weekday_kr = ['월', '화', '수', '목', '금', '토', '일']
