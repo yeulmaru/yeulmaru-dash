@@ -528,24 +528,33 @@ for card_idx, (_, perf) in enumerate(active_df.iterrows()):
         in_amount = sum(r['합계금액'] for r in round_results)
 
         # ── 비교 표 (직전 / 현재 / 변경) ──
-        # 직전 저장값 (현재 바로 이전 row)
-        _p = prev_entry
+        # 직전 저장값: session_state 우선 (같은 세션 누적), DB fallback
+        _last_cur_key = f"last_cur_{perf_id}"
+        if _last_cur_key in st.session_state:
+            _p = st.session_state[_last_cur_key]
+            _p_label = st.session_state.get(_last_cur_key + "_label", "직전")
+        elif prev_entry:
+            _p = prev_entry
+            _p_label = _fmt_date_wd(_p.get('기준일자'))
+        else:
+            _p = None
+            _p_label = "최초입력"
         _p_seats = int(_p.get('합계좌석', 0)) if _p else None
         _p_amount = int(_p.get('합계금액', 0)) if _p else None
         _p_occ = (_p_seats / total_open * 100) if _p and total_open > 0 else None
         _p_vs_tgt = (_p_occ - target_occ) if _p_occ is not None else None
-        _p_label = _fmt_date_wd(_p.get('기준일자')) if _p else "최초입력"
 
         # 입력값 점유율
         in_occ = (in_seats / total_open * 100) if total_open > 0 else 0.0
 
-        _CELL = 'padding:4px 0;'
-        _HDR = f'{_CELL}font-size:14px;font-weight:700;color:#FFFFFF;'
-        _V_PREV = f'{_CELL}font-size:14px;color:#AAA;'
-        _V_CUR = f'{_CELL}font-size:14px;font-weight:700;color:{ACCENT};'
-        _V_CHG = f'{_CELL}font-size:14px;font-weight:700;'
-        _LBL = f'{_CELL}font-size:14px;font-weight:600;'
+        _CELL = 'padding:7px 0;'
+        _HDR = f'{_CELL}font-size:21px;font-weight:700;color:#FFFFFF;'
+        _V_PREV = f'{_CELL}font-size:21px;color:#AAA;'
+        _V_CUR = f'{_CELL}font-size:21px;font-weight:700;color:{ACCENT};'
+        _V_CHG = f'{_CELL}font-size:21px;font-weight:700;'
+        _LBL = f'{_CELL}font-size:21px;font-weight:600;'
 
+        st.markdown('<div style="margin-top:20px;"></div>', unsafe_allow_html=True)
         st.markdown("---")
 
         # 헤더
@@ -620,6 +629,15 @@ for card_idx, (_, perf) in enumerate(active_df.iterrows()):
                     st.session_state.save_results.append(sr)
 
                 if all(sr['status'] != 'error' for sr in save_res):
+                    # 직전 값 session_state에 저장 (현재 cur → 직전으로)
+                    _last_cur_key = f"last_cur_{perf_id}"
+                    st.session_state[_last_cur_key] = {
+                        '합계좌석': cur_seats,
+                        '합계금액': cur_amount,
+                        '기준일자': current.get('기준일자'),
+                    }
+                    _save_time = datetime.now().strftime('%H:%M')
+                    st.session_state[_last_cur_key + "_label"] = f"{_fmt_date_wd(today)} {_save_time}"
                     # 이 카드의 입력 필드 초기화 (counter 증가 → 위젯 재생성)
                     for _rn in range(1, total_rounds + 1):
                         _ckey = f"counter_{perf_id}_{_rn}"
@@ -701,9 +719,18 @@ if has_any:
 
             st.session_state.save_results = all_results
             if all(r['status'] != 'error' for r in all_results):
-                # 성공한 카드들의 입력 필드 초기화 (counter 증가 → 위젯 재생성)
+                # 직전 값 session_state에 저장 + 입력 필드 초기화
+                _save_time = datetime.now().strftime('%H:%M')
                 for _c in input_cards:
                     _pid = _c['perf']['ID']
+                    _cur = _c.get('current') or {}
+                    _last_cur_key = f"last_cur_{_pid}"
+                    st.session_state[_last_cur_key] = {
+                        '합계좌석': int(_cur.get('합계좌석', 0) or 0),
+                        '합계금액': int(_cur.get('합계금액', 0) or 0),
+                        '기준일자': _cur.get('기준일자'),
+                    }
+                    st.session_state[_last_cur_key + "_label"] = f"{_fmt_date_wd(today)} {_save_time}"
                     _tr = int(_c['perf']['총회차']) if pd.notna(_c['perf']['총회차']) else 1
                     for _rn in range(1, _tr + 1):
                         _ckey = f"counter_{_pid}_{_rn}"
