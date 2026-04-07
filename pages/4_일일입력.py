@@ -567,6 +567,7 @@ for card_idx, (_, perf) in enumerate(active_df.iterrows()):
 
         st.markdown('<div style="margin-top:20px;"></div>', unsafe_allow_html=True)
         st.markdown("---")
+        st.markdown('<div style="padding:0 24px 20px 24px;">', unsafe_allow_html=True)
 
         # 헤더
         _hc = st.columns([1.2, 1.5, 1.5, 1, 1.2])
@@ -613,6 +614,8 @@ for card_idx, (_, perf) in enumerate(active_df.iterrows()):
             _r3[2].markdown(_chg_html(in_amount, f"{in_amount/10000:,.1f}만원"), unsafe_allow_html=True)
             _r3[3].markdown(_chg_html(in_occ, f"{in_occ:.1f}%p"), unsafe_allow_html=True)
             _r3[4].markdown(_chg_html(in_occ, f"{in_occ:.1f}%p"), unsafe_allow_html=True)
+
+        st.markdown('</div>', unsafe_allow_html=True)
 
         # ── 카드별 저장 버튼 ──
         # 호환성 alias (혹시 다른 코드에서 쓸 경우)
