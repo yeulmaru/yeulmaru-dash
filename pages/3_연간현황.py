@@ -168,14 +168,15 @@ if detail_df is not None and not detail_df.empty:
             category_orders=_s1_cat_orders,
         )
 
-        # 분기별 세로 음영
+        # 분기별 세로 음영 (2,4분기에 검정 음영)
         for _qi, (_qx0, _qx1) in enumerate([(0.5,3.5),(3.5,6.5),(6.5,9.5),(9.5,12.5)]):
-            _s1_fig.add_vrect(
-                x0=_qx0, x1=_qx1,
-                fillcolor='rgba(255,255,255,0.04)' if _qi % 2 == 0 else 'rgba(255,255,255,0)',
-                layer='below',
-                line_width=0,
-            )
+            if _qi % 2 == 1:
+                _s1_fig.add_vrect(
+                    x0=_qx0, x1=_qx1,
+                    fillcolor='rgba(0,0,0,0.15)',
+                    layer='below',
+                    line_width=0,
+                )
 
         _s1_fig.update_traces(
             marker=dict(size=10, opacity=0.7, line=dict(width=1, color='#FFFFFF')),
