@@ -10,6 +10,9 @@ st.set_page_config(page_title="연간 운영실적", page_icon="📊", layout="w
 from utils.auth import check_password
 check_password()
 
+from utils.sidebar import render_sidebar
+render_sidebar()
+
 st.title("📊 연간 운영 현황")
 st.caption("2012년부터의 공연 운영 데이터를 다양한 관점으로 분석합니다.")
 st.divider()

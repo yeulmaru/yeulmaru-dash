@@ -21,6 +21,9 @@ st.set_page_config(page_title="일일입력", page_icon="📝", layout="wide")
 from utils.auth import check_password
 check_password()
 
+from utils.sidebar import render_sidebar
+render_sidebar()
+
 # ── Cloud 환경 감지 ──
 import os
 _IS_CLOUD = os.path.exists("/mount/src")

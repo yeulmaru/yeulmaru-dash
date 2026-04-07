@@ -7,6 +7,8 @@ from zoneinfo import ZoneInfo
 
 from utils.data_loader import load_daily_input, load_sales_trend, get_base_date, load_performance_master, load_round_details, get_data_source, match_performance, match_performance_category, get_target_occupancy
 from utils.charts import COLORS, apply_common_layout
+from utils.sidebar import render_sidebar
+render_sidebar()
 
 
 def get_contrast_text_color(hex_color):
