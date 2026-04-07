@@ -467,8 +467,9 @@ for card_idx, (_, perf) in enumerate(active_df.iterrows()):
         _hdr_occ_pct = (_hdr_seats / total_open * 100) if total_open > 0 else 0.0
         _hdr_occ_i = round(_hdr_occ_pct)
         _hdr_tgt_i = round(target_occ)
-        _hdr_need = max(0, round(total_open * target_occ / 100) - _hdr_seats)
-        _hdr_need_pct = round(_hdr_need / total_open * 100) if total_open > 0 and _hdr_need > 0 else 0
+        _hdr_tgt_seats = round(total_open * target_occ / 100)
+        _hdr_diff_seats = _hdr_seats - _hdr_tgt_seats
+        _hdr_diff_pct = _hdr_occ_i - _hdr_tgt_i
         _hdr_avail = sum(r['seat'] for r in perf_rounds_info) if perf_rounds_info else base_seat
         _hdr_avail_pct = round(_hdr_avail / total_open * 100) if total_open > 0 else 0
         def _fs(n):
@@ -482,7 +483,7 @@ for card_idx, (_, perf) in enumerate(active_df.iterrows()):
         else:
             _hdr_date = date_range
 
-        ic = st.columns([1.5, 2], gap="small")
+        ic = st.columns([1.5, 2.5], gap="small")
 
         # 좌측: 공연 일시 + 회차
         ic[0].markdown(
@@ -491,28 +492,37 @@ for card_idx, (_, perf) in enumerate(active_df.iterrows()):
             unsafe_allow_html=True,
         )
 
-        # 우측: 미니 표 (현재 / 목표 / 가용)
-        _TD = 'padding:3px 8px;'
-        _TDR = 'padding:3px 8px;text-align:right;'
+        # 우측: 미니 표 (전치: 2행×5열)
+        _TD = 'padding:3px 6px;'
+        _TDR = 'padding:3px 6px;text-align:right;'
+        _TDH = 'padding:3px 6px;text-align:right;color:#999;font-size:15px;'
+        _DIM = '#999999'
+        def _sign(n):
+            return f"+{n:,}" if n > 0 else (f"{n:,}" if n < 0 else "0")
+        _diff_s_color = '#FFFFFF' if _hdr_diff_seats >= 0 else _DIM
+        _diff_p_color = '#FFFFFF' if _hdr_diff_pct >= 0 else _DIM
         _tbl = (
-            f'<table style="font-size:19px;border-collapse:collapse;width:100%;">'
-            f'<tr>'
-            f'<td style="{_TD}">현재</td>'
-            f'<td style="{_TDR}"><span style="color:{_G};font-weight:700;">{_fs(_hdr_seats)}</span>석</td>'
-            f'<td style="{_TDR}">-</td>'
-            f'<td style="{_TDR}"><span style="color:{_G};font-weight:700;">{_hdr_occ_i}</span>%</td>'
+            f'<table style="font-size:17px;border-collapse:collapse;width:100%;">'
+            f'<tr style="border-bottom:1px solid #333;">'
+            f'<td style="{_TD}"></td>'
+            f'<td style="{_TDH}">현재</td>'
+            f'<td style="{_TDH}">목표</td>'
+            f'<td style="{_TDH}">가용</td>'
+            f'<td style="{_TDH}">목표대비</td>'
             f'</tr>'
             f'<tr>'
-            f'<td style="{_TD}">목표</td>'
-            f'<td style="{_TDR}"><span style="color:{_Y};font-weight:700;">{_fs(_hdr_need)}</span>석</td>'
-            f'<td style="{_TDR}"><span style="color:{_Y};font-weight:700;">{_hdr_need_pct}</span>%</td>'
-            f'<td style="{_TDR}"><span style="color:{_G};font-weight:700;">{_hdr_tgt_i}</span>%</td>'
+            f'<td style="{_TD}">객석</td>'
+            f'<td style="{_TDR}"><span style="color:{_G};font-weight:700;">{_fs(_hdr_seats)}</span></td>'
+            f'<td style="{_TDR}"><span style="color:{_Y};font-weight:700;">{_fs(_hdr_tgt_seats)}</span></td>'
+            f'<td style="{_TDR}">{_fs(_hdr_avail)}</td>'
+            f'<td style="{_TDR}"><span style="color:{_diff_s_color};font-weight:700;">{_sign(_hdr_diff_seats)}</span></td>'
             f'</tr>'
             f'<tr>'
-            f'<td style="{_TD}">가용</td>'
-            f'<td style="{_TDR}">{_fs(_hdr_avail)}석</td>'
-            f'<td style="{_TDR}">-</td>'
-            f'<td style="{_TDR}">{_hdr_avail_pct}%</td>'
+            f'<td style="{_TD}">점유율%</td>'
+            f'<td style="{_TDR}"><span style="color:{_G};font-weight:700;">{_hdr_occ_i}</span></td>'
+            f'<td style="{_TDR}"><span style="color:{_Y};font-weight:700;">{_hdr_tgt_i}</span></td>'
+            f'<td style="{_TDR}">{_hdr_avail_pct}</td>'
+            f'<td style="{_TDR}"><span style="color:{_diff_p_color};font-weight:700;">{_sign(_hdr_diff_pct)}</span></td>'
             f'</tr>'
             f'</table>'
         )
