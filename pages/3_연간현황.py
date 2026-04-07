@@ -343,13 +343,18 @@ if detail_df is not None and not detail_df.empty:
             '판매금액(만원)': pd.Series([None] * len(_s1_tbl), dtype='Int64'),
         }).reset_index(drop=True)
 
+        def _zebra(row):
+            if row.name % 2 == 1:
+                return ['background-color: rgba(255,255,255,0.05)'] * len(row)
+            return [''] * len(row)
+
         _s1_styled = _s1_display.style.set_properties(
             **{'color': '#FFEB3B'}, subset=['판매좌석(석)']
         ).set_properties(
             **{'color': '#0FFD02', 'font-weight': '700'}, subset=['점유율(%)']
         ).set_properties(
             **{'color': '#0FFD02'}, subset=['판매금액(만원)']
-        )
+        ).apply(_zebra, axis=1)
 
         _s1_tbl_height = min(35 * (len(_s1_display) + 1) + 3, 600)
         st.dataframe(
