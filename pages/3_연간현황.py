@@ -190,7 +190,7 @@ if detail_df is not None and not detail_df.empty:
                 range=[0, 110],
             ),
             height=500,
-            margin=dict(t=40, r=150),
+            margin=dict(t=40, r=30),
             showlegend=True,
             legend=dict(
                 orientation='h',
@@ -214,17 +214,7 @@ if detail_df is not None and not detail_df.empty:
                     yanchor='bottom',
                     font=dict(color='#FFFFFF', size=13),
                 ),
-                dict(
-                    text='(%)',
-                    x=1.01,
-                    y=1.04,
-                    xref='paper',
-                    yref='paper',
-                    showarrow=False,
-                    xanchor='left',
-                    yanchor='bottom',
-                    font=dict(color='#FFFFFF', size=11),
-                ),
+
             ],
         )
         # ── 카테고리별 평균 점선 + 우측 수치 ──
@@ -249,22 +239,16 @@ if detail_df is not None and not detail_df.empty:
                     _adj_y = _uy + 3
             _used_y.append(_adj_y)
 
-            # 숫자 + 카테고리명 (paper x좌표로 margin 영역에 표시)
+            # 숫자 + 카테고리명 (차트 안쪽 우측)
             _avg_annotations.append(dict(
-                x=1.005, y=_adj_y,
+                x=0.96, y=_adj_y,
                 xref='paper', yref='y',
-                text=f"{_avg:.0f}",
+                text=f"{_avg:.0f}  ({_cat})",
                 showarrow=False,
-                xanchor='left', yanchor='middle',
-                font=dict(color=_color, size=13),
-            ))
-            _avg_annotations.append(dict(
-                x=1.005, y=_adj_y - 2.8,
-                xref='paper', yref='y',
-                text=f"({_cat})",
-                showarrow=False,
-                xanchor='left', yanchor='middle',
-                font=dict(color=_color, size=9),
+                xanchor='right', yanchor='middle',
+                font=dict(color=_color, size=11),
+                bgcolor='rgba(0,0,0,0.6)',
+                borderpad=3,
             ))
 
         # 기존 annotations에 평균 annotations 추가
