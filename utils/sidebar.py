@@ -13,11 +13,27 @@ def _load_logo_b64():
 
 def render_sidebar():
     """공통 사이드바: 로고 + 타이틀 + 커스텀 페이지 메뉴"""
-    # 자동 생성 페이지 메뉴 숨김
-    st.markdown(
-        "<style>section[data-testid='stSidebarNav']{display:none!important}</style>",
-        unsafe_allow_html=True,
-    )
+    # 자동 생성 페이지 메뉴 숨김 (Streamlit 버전별 selector 다중 적용)
+    st.markdown("""
+    <style>
+    /* Streamlit <= 1.30 */
+    section[data-testid="stSidebarNav"] {display:none!important}
+    /* Streamlit 1.31+ */
+    div[data-testid="stSidebarNav"] {display:none!important}
+    /* Streamlit 1.36+ st.navigation */
+    nav[data-testid="stSidebarNav"] {display:none!important}
+    /* 포괄: ul 기반 메뉴 */
+    section[data-testid="stSidebar"] > div:first-child > div:first-child > div > ul {display:none!important}
+    section[data-testid="stSidebar"] ul[data-testid="stSidebarNavItems"] {display:none!important}
+    /* Streamlit 1.37+ appview 내부 nav */
+    div[data-testid="stAppViewBlockContainer"] ~ nav {display:none!important}
+    /* 최상위 sidebar nav separator 포함 */
+    section[data-testid="stSidebar"] [data-testid="stSidebarNavSeparator"] {display:none!important}
+    /* Streamlit 1.40+ collapsible 그룹 */
+    section[data-testid="stSidebar"] [data-testid="stSidebarNavLink"] {display:none!important}
+    section[data-testid="stSidebar"] [data-testid="stSidebarNavItems"] {display:none!important}
+    </style>
+    """, unsafe_allow_html=True)
 
     logo_b64 = _load_logo_b64()
     if logo_b64:
